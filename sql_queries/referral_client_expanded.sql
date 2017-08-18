@@ -3,17 +3,19 @@ select * from Referral
 left join ReferralStatus on ReferralStatus.ReferralStatusId = Referral.StatusId
 left join (
   select * from Client
-inner join Ethnicity on Client.ClientEthnicityID = Ethnicity.EthnicityID
-inner join Country on Client.ClientCountryID = Country.CountryId
-inner join ResidencyStatus on Client.ClientResidencyId = ResidencyStatus.ResidencyId
-inner join ClientAddressType on Client.ClientAddressTypeID = ClientAddressType.ClientAddressTypeID
-inner join Locality on Client.AddressLocalityId = Locality.LocalityId
+left join Ethnicity on Client.ClientEthnicityID = Ethnicity.EthnicityID
+left join Country on Client.ClientCountryID = Country.CountryId
+left join ResidencyStatus on Client.ClientResidencyId = ResidencyStatus.ResidencyId
+left join ClientAddressType on Client.ClientAddressTypeID = ClientAddressType.ClientAddressTypeID
+left join Locality on Client.AddressLocalityId = Locality.LocalityId
   ) as client on client.ClientId = Referral.ClientId
 
 left join Ethnicity on Referral.EthnicityId = Ethnicity.EthnicityID
 left join Locality on Referral.AddressLocalityId = Locality.LocalityId
 left join ClientAddressType on Referral.AddressTypeId = ClientAddressType.ClientAddressTypeID
-left join ReferralAgency on Referral.ReferralAgencyId = ReferralAgency.ReferralAgencyId;
+left join ReferralAgency on Referral.ReferralAgencyId = ReferralAgency.ReferralAgencyId
+
+where client.ClientId NOTNULL ;
 
 --many to one tables
 select * from ReferralBenefit
