@@ -35,6 +35,11 @@ select * from ReferralReason
 table_names = [t.split(' ')[3].strip() for t in table_sql.split(';')[:-1]]
 tables = {table_names[i]: pd.read_sql(t.strip(), con) for i, t in enumerate(table_sql.split(';')[:-1])}
 
+packs = pd.read_sql("""select * from ReferralPack""", con)
+pack_descriptions = pd.read_sql("""select * from PackList""", con)
+
+
+
 column_mapping = {
     'ReferralIssue': 'ClientIssueDescription',
     'ReferralBenefit': 'BenefitTypeName',
@@ -51,3 +56,5 @@ for t in flat_tables:
 
 referrals.to_csv('../../Welcome-Centre-DataCorps-Data/referrals.csv')
 clients.to_csv('../../Welcome-Centre-DataCorps-Data/clients.csv')
+packs.to_csv('../../Welcome-Centre-DataCorps-Data/packs.csv')
+pack_descriptions.to_csv('../../Welcome-Centre-DataCorps-Data/pack_descriptions.csv')
