@@ -9,7 +9,9 @@ left join ReferralStatus on ReferralStatus.ReferralStatusId = Referral.StatusId
 left join Ethnicity on Referral.EthnicityId = Ethnicity.EthnicityID
 left join Locality on Referral.AddressLocalityId = Locality.LocalityId
 left join ClientAddressType on Referral.AddressTypeId = ClientAddressType.ClientAddressTypeID
-left join ReferralAgency on Referral.ReferralAgencyId = ReferralAgency.ReferralAgencyId;""", con)
+left join ReferralAgency on Referral.ReferralAgencyId = ReferralAgency.ReferralAgencyId
+left join (select count(*) as pack_count, ReferralInstanceID from ReferralPack GROUP BY ReferralInstanceID) as pack_count
+on pack_count.ReferralInstanceID = Referral.ReferralInstanceId;""", con)
 referrals = referrals.set_index('ReferralInstanceId')
 
 clients = pd.read_sql("""select * from Client
