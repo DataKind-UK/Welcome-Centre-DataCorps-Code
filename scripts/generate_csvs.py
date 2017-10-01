@@ -33,7 +33,11 @@ select * from ReferralDomesticCircumstances
 select * from ReferralIssue
   inner join ClientIssueCodes on ClientIssueCodes.ClientIssueId = ReferralIssue.ClientIssueID;
 select * from ReferralReason
-  inner join ReferralReasonCodes on ReferralReasonCodes.ReferralReasonId = ReferralReason.ReferralReasonID;"""
+  inner join ReferralReasonCodes on ReferralReasonCodes.ReferralReasonId = ReferralReason.ReferralReasonID;
+select ReferralInstanceId,ClientIssueDescription from ClientIssue
+  LEFT OUTER JOIN Referral on ClientIssue.ClientId = Referral.ClientId
+  LEFT JOIN  ClientIssueCodes on ClientIssueCodes.ClientIssueID = ClientIssue.ClientIssueId;
+  """
 table_names = [t.split(' ')[3].strip() for t in table_sql.split(';')[:-1]]
 tables = {table_names[i]: pd.read_sql(t.strip(), con) for i, t in enumerate(table_sql.split(';')[:-1])}
 
@@ -48,7 +52,8 @@ column_mapping = {
     'ReferralReason': 'ReferralReasonDescription',
     'ReferralDietaryRequirements': 'DietaryRequirementsDescription',
     'ReferralDomesticCircumstances': 'DomesticCircumstancesDescription',
-    'ReferralDocument': 'DocumentEvidenceDescription'
+    'ReferralDocument': 'DocumentEvidenceDescription',
+    "ClientIssue":"ClientIssueDescription"
 }
 
 flat_tables = {t: tables[t].groupby([tables[t].iloc[:,0], column_mapping[t]]).size().unstack().add_prefix(t + '_') for t in tables}
