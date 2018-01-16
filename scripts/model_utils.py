@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import beta
 from tqdm import tqdm_notebook
+from datetime import datetime
 
 
 # Functions to add features (should take referral data frame 
@@ -59,4 +60,53 @@ def calculate_burst_number(referrals_df, break_length=28):
     referrals_df['has_had_previous_burst'] = 1 * (referrals_df['burst_number'] > 1)         
     return referrals_df
 
+def get_current_referral_issues(referrals):
+    referral_reasons = referrals.filter(like='ReferralDomestic').add_prefix('reasons_')
+    referral_document = referrals.filter(like='ReferralDocument').add_prefix('documents_')
+    referral_benefit = referrals.filter(like='ReferralBenefit').add_prefix('benefit_')
+    referral_issue = referrals.filter(like='ReferralIssue').add_prefix('r_issue_')
+    referral_reason = referrals.filter(like='ReferralReason').add_prefix('reason_')
+    client_issue = referrals.filter(like='ClientIssue').add_prefix('c_issue_')
+    referral_agency = pd.get_dummies(referrals['ReferralAgencyName']).add_prefix('agency_')
 
+    X = pd.concat([
+        referral_reasons,
+        referral_document,
+        referral_benefit,
+        referral_issue,
+        referral_reason,
+        referral_agency,
+        client_issue
+    ], axis=1).fillna(False).astype(bool)
+    
+    return X
+
+def get_client_features(clients):
+    clients['ClientDateOfBirth'] = pd.to_datetime(clients['ClientDateOfBirth'])
+    clients['AddressSinceDate'] = pd.to_datetime(clients['AddressSinceDate'])
+    clients['Age'] = datetime.now() - clients['ClientDateOfBirth']
+    clients['Age'] = clients['Age'].dt.days / 365
+    clients.loc[clients['Age'] < 0, 'Age'] += 100
+    clients['AddressLength'] = (datetime.now() - clients['AddressSinceDate']).dt.days / 365
+    categories = pd.get_dummies(clients[['EthnicityDescription', 'ClientCountryID',
+                                'ClientAddressTypeDescription', 'AddressPostCode', 
+                                'LocalityDescription', 'ResidencyDescription']].astype(str))
+    clients['known_partner'] = clients['PartnerId'].notnull()
+
+    client_features = pd.concat([clients[['Age', 'AddressLength', 'ClientIsMale', 'known_partner']], 
+              categories], axis=1)
+    client_features = client_features.fillna(client_features.median())
+    return client_features
+
+
+def get_feature_matrix(referrals, clients):
+    general = referrals[['DependantNumber', 'LivingWithPartner']]
+    current_issues = get_current_referral_issues(referrals)
+    any_issue = current_issues.groupby(referrals['ClientId'], as_index=False, sort=False).expanding().sum() > 0
+    any_issue.index = any_issue.index.droplevel(0)
+    any_issue = any_issue.loc[referrals.index]
+    referral_issues = pd.concat([general, current_issues.add_prefix('current_'), 
+                      any_issue.add_prefix('ever_')], axis=1)
+    client_issues = get_client_features(clients).loc[referrals['ClientId']]
+    client_issues.index = referrals.index
+    return pd.concat([referral_issues, client_issues], axis=1)
