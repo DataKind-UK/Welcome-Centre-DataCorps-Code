@@ -1,0 +1,304 @@
+// This file contains the json for a request to the DKUK Model API. It is a serialised version
+// of the tables in TWC's database. The data for each table can be generated using the queries
+// in ./extract_data_queries.sql. The below data is for:
+// --> ClientId = 10
+// --> ReferralInstanceId being scored = 15739
+{  
+   "Referral":[  
+      {  
+         "ReferralInstanceId":12,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"01/13/14 00:00:00",
+         "ReferralReadyDate":"01/13/14 00:00:00",
+         "ReferralCollectedDate":"01/13/14 00:00:00",
+         "ReferralWorkerID":4,
+         "ReferralPreparedWorkerId":null,
+         "ReferralHandedWorkerId":null,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":6,
+         "AddressTypeId":4,
+         "ReferralAgencyId":31,
+         "ReferralAgencyWorkerName":null,
+         "ReferralAgencyTelephoneNumber":null,
+         "DietaryExtraNotes":null,
+         "ReferralNotes":"NFA-New to area",
+         "UpdateTimeStamp":"04/01/14 09:53:43"
+      },
+      {  
+         "ReferralInstanceId":13,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"02/03/14 00:00:00",
+         "ReferralReadyDate":"02/03/14 00:00:00",
+         "ReferralCollectedDate":"02/03/14 00:00:00",
+         "ReferralWorkerID":4,
+         "ReferralPreparedWorkerId":null,
+         "ReferralHandedWorkerId":null,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":6,
+         "AddressTypeId":1,
+         "ReferralAgencyId":86,
+         "ReferralAgencyWorkerName":null,
+         "ReferralAgencyTelephoneNumber":null,
+         "DietaryExtraNotes":null,
+         "ReferralNotes":"New tenancy-new JSA claim",
+         "UpdateTimeStamp":"04/01/14 09:53:43"
+      },
+      {  
+         "ReferralInstanceId":2631,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"06/09/14 15:31:00",
+         "ReferralReadyDate":"06/09/14 15:31:00",
+         "ReferralCollectedDate":"06/09/14 15:31:00",
+         "ReferralWorkerID":7,
+         "ReferralPreparedWorkerId":7,
+         "ReferralHandedWorkerId":7,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":6,
+         "AddressTypeId":1,
+         "ReferralAgencyId":32,
+         "ReferralAgencyWorkerName":"Balli",
+         "ReferralAgencyTelephoneNumber":null,
+         "DietaryExtraNotes":null,
+         "ReferralNotes":null,
+         "UpdateTimeStamp":"06/09/14 15:31:52"
+      },
+      {  
+         "ReferralInstanceId":2733,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"06/16/14 15:46:00",
+         "ReferralReadyDate":"06/16/14 15:46:00",
+         "ReferralCollectedDate":"06/16/14 15:46:00",
+         "ReferralWorkerID":7,
+         "ReferralPreparedWorkerId":7,
+         "ReferralHandedWorkerId":7,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":6,
+         "AddressTypeId":1,
+         "ReferralAgencyId":86,
+         "ReferralAgencyWorkerName":"Nicky",
+         "ReferralAgencyTelephoneNumber":"01484 414782",
+         "DietaryExtraNotes":null,
+         "ReferralNotes":null,
+         "UpdateTimeStamp":"06/16/14 15:46:05"
+      },
+      {  
+         "ReferralInstanceId":2873,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"06/23/14 16:42:00",
+         "ReferralReadyDate":"06/23/14 16:42:00",
+         "ReferralCollectedDate":"06/23/14 16:42:00",
+         "ReferralWorkerID":7,
+         "ReferralPreparedWorkerId":7,
+         "ReferralHandedWorkerId":7,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":6,
+         "AddressTypeId":1,
+         "ReferralAgencyId":86,
+         "ReferralAgencyWorkerName":"John",
+         "ReferralAgencyTelephoneNumber":"01484 414782",
+         "DietaryExtraNotes":null,
+         "ReferralNotes":null,
+         "UpdateTimeStamp":"06/23/14 16:42:17"
+      },
+      {  
+         "ReferralInstanceId":14956,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"10/18/16 11:24:00",
+         "ReferralReadyDate":"10/18/16 13:06:00",
+         "ReferralCollectedDate":"10/18/16 13:06:00",
+         "ReferralWorkerID":15,
+         "ReferralPreparedWorkerId":26,
+         "ReferralHandedWorkerId":26,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":6,
+         "AddressTypeId":4,
+         "ReferralAgencyId":65,
+         "ReferralAgencyWorkerName":"Robin",
+         "ReferralAgencyTelephoneNumber":"01484 483141",
+         "DietaryExtraNotes":null,
+         "ReferralNotes":null,
+         "UpdateTimeStamp":"10/18/16 13:06:42"
+      },
+      {  
+         "ReferralInstanceId":15293,
+         "StatusId":3,
+         "ReferralOnHold":"0",
+         "ReferralTakenDate":"11/08/16 12:32:00",
+         "ReferralReadyDate":"11/08/16 16:46:00",
+         "ReferralCollectedDate":"11/08/16 16:46:00",
+         "ReferralWorkerID":1,
+         "ReferralPreparedWorkerId":1,
+         "ReferralHandedWorkerId":1,
+         "ClientId":10,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "EthnicityId":1,
+         "AddressLocalityId":null,
+         "AddressTypeId":4,
+         "ReferralAgencyId":89,
+         "ReferralAgencyWorkerName":"Sarah",
+         "ReferralAgencyTelephoneNumber":null,
+         "DietaryExtraNotes":null,
+         "ReferralNotes":"P was in hospital he has now been discharged he is going into a new tenancy and he is going to put in  a new benefit claim",
+         "UpdateTimeStamp":"11/08/16 16:46:33"
+      }
+   ],
+   "Client":[  
+      {  
+         "ClientId":10,
+         "ClientTitle":"Mr",
+         "ClientFirstName":"P",
+         "ClientLastName":"A",
+         "ClientNickName":null,
+         "ClientDateOfBirth":"03/01/68 00:00:00",
+         "ClientIsMale":"1",
+         "ClientEthnicityID":1,
+         "ClientCountryID":null,
+         "ClientResidencyId":null,
+         "ClientAddressTypeID":2,
+         "AddressLine1":null,
+         "AddressLine2":null,
+         "AddressLocalityId":null,
+         "AddressLine4":null,
+         "AddressPostCode":"HD1 5",
+         "AddressSinceDate":"12/02/16 00:00:00",
+         "PreviousAddressList":null,
+         "PartnerName":null,
+         "PartnerId":null,
+         "LivingWithPartner":"0",
+         "DependantDetails":null,
+         "DependantNumber":0,
+         "DietaryExtraNotes":null,
+         "IssueExtraNotes":null,
+         "Enabled":"1",
+         "LastModifiedDate":"12/02/16 00:00:00",
+         "LastModifiedWorkerId":8,
+         "UpdateTimestamp":"12/02/16 14:06:17"
+      }
+   ],
+   "ReferralBenefit":[  
+      {  
+         "ReferralInstanceId":15739,
+         "BenefitTypeId":2
+      }
+   ],
+   "ReferralDietaryRequirements":[  
+
+   ],
+   "ReferralDomesticCircumstances":[  
+      {  
+         "ReferralInstanceID":2631,
+         "DomesticCircumstancesID":5
+      },
+      {  
+         "ReferralInstanceID":2733,
+         "DomesticCircumstancesID":6
+      },
+      {  
+         "ReferralInstanceID":2873,
+         "DomesticCircumstancesID":5
+      },
+      {  
+         "ReferralInstanceID":2873,
+         "DomesticCircumstancesID":6
+      },
+      {  
+         "ReferralInstanceID":15293,
+         "DomesticCircumstancesID":6
+      },
+      {  
+         "ReferralInstanceID":15739,
+         "DomesticCircumstancesID":6
+      }
+   ],
+   "ReferralDocument":[  
+
+   ],
+   "ReferralIssue":[  
+      {  
+         "ReferralInstanceID":15293,
+         "ClientIssueID":9
+      }
+   ],
+   "ReferralReason":[  
+      {  
+         "ReferralInstanceID":2631,
+         "ReferralReasonID":29
+      },
+      {  
+         "ReferralInstanceID":2733,
+         "ReferralReasonID":29
+      },
+      {  
+         "ReferralInstanceID":2873,
+         "ReferralReasonID":29
+      },
+      {  
+         "ReferralInstanceID":14956,
+         "ReferralReasonID":43
+      },
+      {  
+         "ReferralInstanceID":15293,
+         "ReferralReasonID":29
+      },
+      {  
+         "ReferralInstanceID":15293,
+         "ReferralReasonID":56
+      },
+      {  
+         "ReferralInstanceID":15739,
+         "ReferralReasonID":29
+      }
+   ],
+   "ClientIssue":[  
+      {  
+         "ClientId":10,
+         "ClientIssueId":9
+      }
+   ]
+}
