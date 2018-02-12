@@ -1,9 +1,4 @@
-// This file contains the json for a request to the DKUK Model API. It is a serialised version
-// of the tables in TWC's database. The data for each table can be generated using the queries
-// in ./extract_data_queries.sql. The below data is for:
-// --> ClientId = 10
-// --> ReferralInstanceId being scored = 15739
-{  
+{
    "Referral":[  
       {  
          "ReferralInstanceId":12,

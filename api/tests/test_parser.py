@@ -1,7 +1,9 @@
 import sqlite3
 from unittest import TestCase
 import pandas as pd
+import numpy as np
 
+from api.utils.model import TWCModel
 from api.utils.transformer import Transformer
 
 sql_dict = {'Referral': """SELECT * FROM Referral;""",
@@ -44,10 +46,42 @@ class TestTransformer(TestCase):
 
     def test_transformer_fit_transform(self):
         test_data = get_training_data()
-        X = self.transformer.fit_transform(test_data)
+        X, _ = self.transformer.fit_transform(test_data)
         self.assertGreater(X.shape[1], 200)
         self.transformer.column_schema = self.transformer.column_schema[:200]
 
         test_data = get_training_data()
-        X = self.transformer.transform(test_data)
+        X, _ = self.transformer.transform(test_data)
         self.assertTrue((X.columns == self.transformer.column_schema).all())
+
+class TestModel(TestCase):
+    def setUp(self):
+        test_data = get_training_data()
+        self.model = TWCModel()
+        self.model.fit(test_data)
+
+    def test_model_predict(self):
+        test_data = get_training_data()
+        result = self.model.predict(test_data)
+        print(result)
+
+    def test_model_save_blah(self):
+        test_data = get_training_data()
+        r1 = self.model.predict(test_data)
+        self.model.save('model.p')
+
+    def test_model_save_load(self):
+        test_data = get_training_data()
+        r1 = self.model.predict(test_data)
+        self.model.save('temp.p')
+        import os
+        self.assertTrue(os.path.exists('temp.p'))
+        model = TWCModel()
+        model.load('temp.p')
+        test_data = get_training_data()
+        r2 = model.predict(test_data)
+        self.assertTrue(((r1-r2) < 1E-9).all())
+
+    def tearDown(self):
+        import os
+        os.remove('temp.p')
