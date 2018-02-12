@@ -33,13 +33,21 @@ path = '../../../Welcome-Centre-DataCorps-Data/ClientDatabaseStructure.mdb.sqlit
 con = sqlite3.connect(path)
 
 def get_training_data():
-    return {k: pd.read_sql(v, con=con) for k, v in sql_dict.items()}
+    tables = {k: pd.read_sql(v, con=con) for k, v in sql_dict.items()}
+    tables['Referral'] = tables['Referral'][tables['Referral']['ReferralInstanceId'] < 200]
+    return tables
 
 
 class TestTransformer(TestCase):
     def setUp(self):
         self.transformer = Transformer()
-        self.test_data = get_training_data()
 
     def test_transformer_fit_transform(self):
-        self.transformer.fit_transform(self.test_data)
+        test_data = get_training_data()
+        X = self.transformer.fit_transform(test_data)
+        self.assertGreater(X.shape[1], 200)
+        self.transformer.column_schema = self.transformer.column_schema[:200]
+
+        test_data = get_training_data()
+        X = self.transformer.transform(test_data)
+        self.assertTrue((X.columns == self.transformer.column_schema).all())
