@@ -1,3 +1,5 @@
+import json
+
 from flask import request
 from flask_restplus import Resource
 from api import api
@@ -14,5 +16,7 @@ class Score(Resource):
 
     def post(self):
         json_data = request.get_json(force=True)
+        if type(json_data) == str:
+            json_data = json.loads(json_data)
         tables = parse_json_reponse_into_df_dict(json_data)
         return self.model.predict(tables)[0]
