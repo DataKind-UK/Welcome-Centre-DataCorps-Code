@@ -31,12 +31,15 @@ LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;
 'ClientIssue': """SELECT * FROM ClientIssue;"""
 }
 
-path = '../../../Welcome-Centre-DataCorps-Data/ClientDatabaseStructure.mdb.sqlite'
+import os
+
+file_path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.join(file_path, '../../../Welcome-Centre-DataCorps-Data/ClientDatabaseStructure.mdb.sqlite')
 con = sqlite3.connect(path)
 
-def get_training_data():
+def get_training_data(limit=200):
     tables = {k: pd.read_sql(v, con=con) for k, v in sql_dict.items()}
-    tables['Referral'] = tables['Referral'][tables['Referral']['ReferralInstanceId'] < 200]
+    tables['Referral'] = tables['Referral'][tables['Referral']['ReferralInstanceId'] < limit]
     return tables
 
 
