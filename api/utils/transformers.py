@@ -1,0 +1,262 @@
+import pandas as pd
+from tqdm import tqdm
+from datetime import datetime
+import json
+import sqlite3
+
+
+class ConsolidateTablesTransformer(object):
+    """This transformer takes the dictionary of tables and produces a master referral table"""
+    REQUIRED_TABLES = [
+                        'Referral', 'ReferralDomesticCircumstances',
+                       'ReferralIssue', 'Client', 'ReferralDietaryRequirements',
+                       'ReferralBenefit', 'ReferralReason', 'ReferralDocument',
+                       'ClientIssue'
+    ]
+    
+    FLATTEN_TABLES_COLUMN_MAPPING = {
+    'ReferralIssue': ['ReferralInstanceID', 'ClientIssueID'],
+    'ReferralBenefit': ('ReferralInstanceId', 'BenefitTypeId'),
+    'ReferralReason': ('ReferralInstanceID', 'ReferralReasonID'),
+    'ReferralDietaryRequirements': ('ReferralInstanceID', 'DietaryRequirementsID'),
+    'ReferralDomesticCircumstances': ('ReferralInstanceID', 'DomesticCircumstancesID'),
+    'ReferralDocument': ('ReferralInstanceId','ReferralDocumentId'),
+    }
+            
+        
+    def fit_transform(self, tables):
+        rt = self.transform(tables)
+        return rt
+
+    def transform(self, tables):
+        rt = self.generate_master_referral_table(tables)        
+        return rt
+        
+        
+    def process_referral_table(self, referral_table):
+        referral_table['ReferralTakenDate'] = pd.to_datetime(referral_table['ReferralTakenDate'])
+        referral_table = referral_table.set_index('ReferralInstanceId')
+        referral_table = referral_table.add_prefix('Referral_')
+        return referral_table
+    
+    def process_client_table(self, client_table):
+        client_table['ClientDateOfBirth'] = pd.to_datetime(client_table['ClientDateOfBirth'])
+        client_table['AddressSinceDate'] = pd.to_datetime(client_table['AddressSinceDate'])
+        client_table['Age'] = datetime.now() - client_table['ClientDateOfBirth']
+        client_table['Age'] = client_table['Age'].dt.days / 365
+        client_table.loc[client_table['Age'] < 0, 'Age'] += 100
+        client_table['AddressLength'] = (datetime.now() - client_table['AddressSinceDate']).dt.days / 365
+        dummied_cols = ['ClientEthnicityID', 'ClientCountryID', 'ClientAddressTypeID', 
+                        'AddressPostCode', 'AddressLocalityId', 'ClientResidencyId']
+        categories = pd.get_dummies(client_table[dummied_cols].astype(str),
+                                   prefix=dummied_cols,
+                                   prefix_sep='_')
+        client_table = pd.concat([client_table, categories], axis=1)
+        client_table = client_table.drop(dummied_cols, axis=1)
+        client_table['KnownPartner'] = client_table['PartnerId'].notnull()
+        client_table = client_table = client_table.add_prefix('Client_')
+        return client_table
+    
+    def generate_master_referral_table(self, tables):
+        # Check all the correct table entries are there
+        for t in self.REQUIRED_TABLES:
+            try:
+                tables[t]
+            except KeyError:
+                 raise Exception("""{} table entry not found, this table is required,
+                                     if there is no data then an empty dataframe 
+                                     should be entered in the tables dictionary""".format(t))
+                                 
+        # Get the referral table and process
+        if not tables['Referral'].empty:
+            referral_table = tables['Referral']
+            referral_table = self.process_referral_table(referral_table)
+        else:
+            raise Exception('Referral table contains no data, this table must be populated')
+                                 
+        # Flatten all other referral related tables and join to referral table
+        flat_tables = {}
+        for key in self.FLATTEN_TABLES_COLUMN_MAPPING.keys():
+            if not tables[key].empty:
+                flat_table = (tables[key].groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
+                                                .size().unstack().add_prefix(key + '_'))
+                referral_table = referral_table.merge(flat_table, left_index=True,
+                                                      right_index=True, how='left')
+
+        # Get the Client Table and process
+        if not tables['Client'].empty:
+            client_table = tables['Client']
+            client_table = self.process_client_table(client_table)                             
+        else:
+            raise Exception('Client table contains no data, this table must be populated')
+                                 
+        # Get the Client Issue table and add to Client table
+        if not tables['ClientIssue'].empty:
+            client_issue_table = tables['ClientIssue'].groupby(['ClientId', 'ClientIssueId']).size().unstack()
+            client_issue_table = client_issue_table.add_prefix('ClientIssue_')
+            client_table = pd.concat([client_table, client_issue_table], axis=1)
+        else:
+            pass
+        
+        # Join Client and Referral Table together into master table
+        master_table = referral_table.merge(client_table, left_on='Referral_ClientId',
+                                            right_on='Client_ClientId', how='left')
+        return master_table
+
+class AddTimeFeaturesTransformer(object):
+    def fit_transform(self, referral_table, window=365, break_length=28, break_coefficient=1):
+        rt = self.transform(referral_table, window=365, break_length=28, break_coefficient=1)
+        return rt
+
+    def transform(self, referral_table, window=365, break_length=28, break_coefficient=1):
+        referral_table = self.calc_look_ahead_stats(referral_table, window=365,
+                                                    break_length=28, break_coefficient=1)        
+        return referral_table
+        
+    def calc_look_ahead_stats(self, referrals, window=365, break_length=28, break_coefficient=1):
+        all_ratios = []
+        referral_no = referrals.assign(count=1).groupby('Referral_ClientId').expanding()['count'].sum()
+        referral_no = referral_no.reset_index().set_index('level_1')['count']
+        referrals['TimeFeature_ReferralNumber'] = referral_no.loc[referrals.index]
+        for i in tqdm(range(1, int(referral_no.max()))):
+            # Grab the segment for each no of referrals
+            segment = referrals.loc[referral_no == i, :]
+            reference_date = segment.set_index('Referral_ClientId')['Referral_ReferralTakenDate']
+            referrals = referrals.assign(reference_date=reference_date.reindex(referrals['Referral_ClientId']).values)
+            date_diff = (referrals['Referral_ReferralTakenDate'] - referrals['reference_date']).dt.days
+            year_range = referrals[(date_diff >= 0) & (date_diff <= window)]
+
+            gaps = ((year_range.sort_values('Referral_ReferralTakenDate')
+                     .groupby('Referral_ClientId')['Referral_ReferralTakenDate']
+                     .diff().dt.days > break_length)
+                    .groupby(year_range['Referral_ClientId']).sum())
+            counts = (year_range.groupby('Referral_ClientId').size()) - 1
+            future_referral_score = (counts - gaps * break_coefficient) / (window / 7)
+            segment_ratios = pd.concat([counts, future_referral_score, gaps],
+                                       axis=1).loc[segment['Referral_ClientId']]
+            segment_ratios.columns = ['TimeFeature_FutureReferralCount', 'TimeFeature_FutureReferralScore',
+                                      'TimeFeature_FutureReferralGaps']
+            segment_ratios.index = segment.index
+            all_ratios.append(segment_ratios)
+        all_ratios_df = pd.concat(all_ratios).reindex(referrals.index)
+        referrals[all_ratios_df.columns] = all_ratios_df
+        return referrals 
+
+class SplitCurrentAndEverTransformer(object):
+    """This Transformer takes the full referral dataframe and for a selected set of
+        features splits them out into current referral features and ever referral features.
+        e.g. current referral feature might be if a client has been referred by Agency 1
+        but ever referral feature might be if a client has ever been referred by Agency1"""
+    
+    def __init__(self, features_to_split):
+        self.features_to_split = features_to_split
+        
+    def fit_transform(self, referral_table):
+        rt = self.transform(referral_table)
+        return rt
+
+    def transform(self, referral_table):
+        # Get list of features to split that are in dataframe
+        features_to_split = [i for i in self.features_to_split if i in referral_table.columns]
+        # Get dataframe of current features
+        current_features = referral_table[features_to_split]
+        # Get any time features
+        any_features = current_features.groupby(referral_table['Referral_ClientId'],
+                                                as_index=False, sort=False).expanding().sum() > 0
+        any_features.index = any_features.index.droplevel(0)
+        # Re-index to the referral table
+        any_features = any_features.loc[referral_table.index]
+        # Remove the original features from referral table
+        referral_table = referral_table.drop(features_to_split, axis=1)
+        # Merge all three together
+        return pd.concat([referral_table, current_features.add_suffix('_Current'),
+                          any_features.add_suffix('_Ever')], axis=1)
+
+class AlignFeaturesToColumnSchemaTransformer(object):
+    """This transformer takes the column schema defined by the model and
+        selects the features from the referral table using this schema
+        any missing columns are filled with 0"""
+    
+    def __init__(self, column_schema):
+        self.column_schema = column_schema
+        
+    def fit_transform(self, referral_table):
+        X = self.transform(referral_table)
+        y = referral_table['TimeFeature_FutureReferralScore']
+        return X, y, referral_table
+
+    def transform(self, referral_table):
+        return referral_table.reindex(self.column_schema, axis=1)
+
+class FullTransformer(object):
+    def __init__(self, features_to_split, column_schema):
+        self.column_schema = column_schema
+        self.features_to_split = features_to_split
+    
+    def fit_transform(self, tables_dict):
+        return self.transform(tables_dict)
+
+
+    def transform(self, tables_dict):
+        consolidate = ConsolidateTablesTransformer()
+        add_time_features = AddTimeFeaturesTransformer()
+        split_current_and_ever = SplitCurrentAndEverTransformer(self.features_to_split)
+        align = AlignFeaturesToColumnSchemaTransformer(self.column_schema)
+        referral_table = consolidate.fit_transform(tables_dict)
+        referral_table = add_time_features.fit_transform(referral_table,
+                                          window=365, break_length=28, break_coefficient=1)
+        referral_table = split_current_and_ever.fit_transform(referral_table)
+        X, y, referral_table = align.fit_transform(referral_table)
+        return X, y, referral_table
+
+class ParseJSONToTablesTransformer(object):
+    """This transformer takes the json from the request
+    and turns it into a dictionary of tables"""
+        
+    def fit_transform(self, request_json_string):
+        return self.transform(request_json_string)
+
+    def transform(self, request_json_string):
+        json_data = json.loads(request_json_string)
+        tables_dict = {}
+        for k, v in json_data.items():
+            if v:
+                tables_dict[k] = pd.DataFrame(v)
+            else:
+                tables_dict[k] = pd.DataFrame()
+        return tables_dict
+
+class TrainingDataGenerator(object):
+    SQL_DICT = {'Referral': """SELECT * FROM Referral;""",
+                
+                'Client': """SELECT * FROM Client;""",
+                
+                'ReferralBenefit':"""SELECT ref_dim.* FROM ReferralBenefit as ref_dim
+                LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;""",
+                
+                'ReferralDietaryRequirements':"""SELECT ref_dim.* FROM ReferralDietaryRequirements as ref_dim
+                LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;""",
+
+                'ReferralDocument':"""SELECT ref_dim.* FROM ReferralDocument as ref_dim
+                LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;""",
+
+                'ReferralDomesticCircumstances': """SELECT ref_dim.* FROM ReferralDomesticCircumstances as ref_dim
+                LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;""",
+
+                'ReferralIssue':"""SELECT ref_dim.* FROM ReferralIssue as ref_dim
+                LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;""",
+
+                'ReferralReason': """SELECT ref_dim.* FROM ReferralReason as ref_dim
+                LEFT JOIN  Referral on Referral.ReferralInstanceId = ref_dim.ReferralInstanceId;""",
+
+                'ClientIssue': """SELECT * FROM ClientIssue;"""
+                }
+    
+    def __init__(self, database_path):
+        self.con = sqlite3.connect(database_path)
+
+    def get_training_data(self, limit=200):
+        tables_dict = {k: pd.read_sql(v, con=self.con) for k, v in self.SQL_DICT.items()}
+        tables_dict['Referral'] = (tables_dict['Referral'][tables_dict['Referral']
+                                            ['ReferralInstanceId'] < limit])
+        return tables_dict
