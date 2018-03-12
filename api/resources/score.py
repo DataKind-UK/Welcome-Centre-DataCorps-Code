@@ -3,8 +3,8 @@ import json
 from flask import request
 from flask_restplus import Resource
 from api import api
-from api.utils.model import TWCModel
-from api.utils.parser import parse_json_reponse_into_df_dict
+from api.utils.models import TWCModel
+from api.utils.transformers import ParseJSONToTablesTransformer
 import os
 
 @api.route('/score')
@@ -12,11 +12,12 @@ class Score(Resource):
     def __init__(self, api, *args, **kwargs):
         self.model = TWCModel()
         self.model.load(os.getenv('MODEL_PATH', 'model.p'))
+        self.parser = ParseJSONToTablesTransformer()
         super().__init__(api, *args, **kwargs)
 
     def post(self):
         json_data = request.get_json(force=True)
         if type(json_data) == str:
             json_data = json.loads(json_data)
-        tables = parse_json_reponse_into_df_dict(json_data)
+        tables = self.parser.transform(json_data)
         return self.model.predict(tables)[0]

@@ -4,8 +4,14 @@ from datetime import datetime
 import json
 import sqlite3
 
+class BaseTransformer(object):
+    def fit_transform(self, X):
+        return self.transform(X)
 
-class ConsolidateTablesTransformer(object):
+    def transform(self, X):
+        pass
+
+class ConsolidateTablesTransformer(BaseTransformer):
     """This transformer takes the dictionary of tables and produces a master referral table"""
     REQUIRED_TABLES = [
                         'Referral', 'ReferralDomesticCircumstances',
@@ -22,11 +28,6 @@ class ConsolidateTablesTransformer(object):
     'ReferralDomesticCircumstances': ('ReferralInstanceID', 'DomesticCircumstancesID'),
     'ReferralDocument': ('ReferralInstanceId','ReferralDocumentId'),
     }
-            
-        
-    def fit_transform(self, tables):
-        rt = self.transform(tables)
-        return rt
 
     def transform(self, tables):
         rt = self.generate_master_referral_table(tables)        
@@ -45,16 +46,18 @@ class ConsolidateTablesTransformer(object):
         client_table['Age'] = datetime.now() - client_table['ClientDateOfBirth']
         client_table['Age'] = client_table['Age'].dt.days / 365
         client_table.loc[client_table['Age'] < 0, 'Age'] += 100
+        client_table['ClientIsMale'] *= 1
+        client_table['KnownPartner'] = client_table['PartnerId'].notnull() * 1
         client_table['AddressLength'] = (datetime.now() - client_table['AddressSinceDate']).dt.days / 365
+
         dummied_cols = ['ClientEthnicityID', 'ClientCountryID', 'ClientAddressTypeID', 
                         'AddressPostCode', 'AddressLocalityId', 'ClientResidencyId']
         categories = pd.get_dummies(client_table[dummied_cols].astype(str),
                                    prefix=dummied_cols,
                                    prefix_sep='_')
-        client_table = pd.concat([client_table, categories], axis=1)
-        client_table = client_table.drop(dummied_cols, axis=1)
-        client_table['KnownPartner'] = client_table['PartnerId'].notnull()
-        client_table = client_table = client_table.add_prefix('Client_')
+        variables = ['Age', 'AddressLength', 'ClientIsMale', 'KnownPartner', 'ClientId']
+        client_table = pd.concat([client_table[variables], categories], axis=1)
+        client_table = client_table.add_prefix('Client_')
         return client_table
     
     def generate_master_referral_table(self, tables):
@@ -103,14 +106,16 @@ class ConsolidateTablesTransformer(object):
                                             right_on='Client_ClientId', how='left')
         return master_table
 
-class AddTimeFeaturesTransformer(object):
-    def fit_transform(self, referral_table, window=365, break_length=28, break_coefficient=1):
-        rt = self.transform(referral_table, window=365, break_length=28, break_coefficient=1)
-        return rt
+class AddTimeFeaturesTransformer(BaseTransformer):
+    def __init__(self, window=365, break_length=28, break_coefficients=1):
+        self.window = window
+        self.break_length = break_length
+        self.break_coefficients = break_coefficients
 
-    def transform(self, referral_table, window=365, break_length=28, break_coefficient=1):
-        referral_table = self.calc_look_ahead_stats(referral_table, window=365,
-                                                    break_length=28, break_coefficient=1)        
+
+    def transform(self, referral_table):
+        referral_table = self.calc_look_ahead_stats(referral_table, self.window,
+                                                    self.break_length, self.break_coefficients)
         return referral_table
         
     def calc_look_ahead_stats(self, referrals, window=365, break_length=28, break_coefficient=1):
@@ -142,22 +147,21 @@ class AddTimeFeaturesTransformer(object):
         referrals[all_ratios_df.columns] = all_ratios_df
         return referrals 
 
-class SplitCurrentAndEverTransformer(object):
+class SplitCurrentAndEverTransformer(BaseTransformer):
     """This Transformer takes the full referral dataframe and for a selected set of
         features splits them out into current referral features and ever referral features.
         e.g. current referral feature might be if a client has been referred by Agency 1
         but ever referral feature might be if a client has ever been referred by Agency1"""
     
-    def __init__(self, features_to_split):
-        self.features_to_split = features_to_split
-        
-    def fit_transform(self, referral_table):
-        rt = self.transform(referral_table)
-        return rt
+    def __init__(self, features_classes_to_split):
+        self.features_classes_to_split = features_classes_to_split
 
     def transform(self, referral_table):
         # Get list of features to split that are in dataframe
-        features_to_split = [i for i in self.features_to_split if i in referral_table.columns]
+        features_to_split = []
+        for c in self.features_classes_to_split:
+            features_to_split += list(referral_table.filter(like=c).columns)
+
         # Get dataframe of current features
         current_features = referral_table[features_to_split]
         # Get any time features
@@ -172,21 +176,41 @@ class SplitCurrentAndEverTransformer(object):
         return pd.concat([referral_table, current_features.add_suffix('_Current'),
                           any_features.add_suffix('_Ever')], axis=1)
 
+
+
 class AlignFeaturesToColumnSchemaTransformer(object):
     """This transformer takes the column schema defined by the model and
         selects the features from the referral table using this schema
         any missing columns are filled with 0"""
-    
-    def __init__(self, column_schema):
-        self.column_schema = column_schema
+
+    to_drop = ['Referral_StatusId', 'Referral_ReferralOnHold',
+       'Referral_ReferralTakenDate', 'Referral_ReferralReadyDate',
+       'Referral_ReferralCollectedDate', 'Referral_ReferralWorkerID',
+       'Referral_ReferralPreparedWorkerId', 'Referral_ReferralHandedWorkerId',
+       'Referral_ClientId', 'Referral_PartnerName', 'Referral_PartnerId',
+       'Referral_DependantDetails', 'Referral_EthnicityId',
+       'Referral_AddressLocalityId', 'Referral_AddressTypeId',
+       'Referral_ReferralAgencyId', 'Referral_ReferralAgencyWorkerName',
+       'Referral_ReferralAgencyTelephoneNumber', 'Referral_DietaryExtraNotes',
+       'Referral_ReferralNotes', 'Referral_UpdateTimeStamp']
+
+    to_drop += ['Referral_ClientId', 'Client_ClientId', 'reference_date']
+
+    to_drop += ['TimeFeature_ReferralNumber', 'TimeFeature_FutureReferralCount',
+       'TimeFeature_FutureReferralScore', 'TimeFeature_FutureReferralGaps']
+
+
+    def __init__(self):
+        self.column_schema = None
         
     def fit_transform(self, referral_table):
-        X = self.transform(referral_table)
-        y = referral_table['TimeFeature_FutureReferralScore']
-        return X, y, referral_table
+        self.column_schema = list(referral_table.drop(self.to_drop, axis=1).columns)
+        return self.transform(referral_table)
 
     def transform(self, referral_table):
-        return referral_table.reindex(self.column_schema, axis=1)
+        X = referral_table.reindex(self.column_schema, axis=1)
+        y = referral_table['TimeFeature_FutureReferralScore']
+        return X, y, referral_table[self.to_drop]
 
 class FullTransformer(object):
     def __init__(self, features_to_split, column_schema):
@@ -203,18 +227,25 @@ class FullTransformer(object):
         split_current_and_ever = SplitCurrentAndEverTransformer(self.features_to_split)
         align = AlignFeaturesToColumnSchemaTransformer(self.column_schema)
         referral_table = consolidate.fit_transform(tables_dict)
-        referral_table = add_time_features.fit_transform(referral_table,
-                                          window=365, break_length=28, break_coefficient=1)
+        referral_table = add_time_features.fit_transform(referral_table)
         referral_table = split_current_and_ever.fit_transform(referral_table)
         X, y, referral_table = align.fit_transform(referral_table)
         return X, y, referral_table
 
-class ParseJSONToTablesTransformer(object):
+class TransformerPipeline(BaseTransformer):
+    def __init__(self, steps, aligner):
+        self.pipeline = steps
+        self.aligner = aligner
+
+    def transform(self, X):
+        for transformer in self.pipeline:
+            X = transformer.fit_transform(X)
+
+        return self.aligner.fit_transform(X)
+
+class ParseJSONToTablesTransformer(BaseTransformer):
     """This transformer takes the json from the request
     and turns it into a dictionary of tables"""
-        
-    def fit_transform(self, request_json_string):
-        return self.transform(request_json_string)
 
     def transform(self, request_json_string):
         json_data = json.loads(request_json_string)
