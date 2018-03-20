@@ -11,6 +11,11 @@ class BaseTransformer(object):
     def transform(self, X):
         pass
 
+class TimeFeatureTransformer(BaseTransformer):
+    def fit_transform(self, X):
+        pass
+
+
 class ConsolidateTablesTransformer(BaseTransformer):
     """This transformer takes the dictionary of tables and produces a master referral table"""
     REQUIRED_TABLES = [
@@ -210,7 +215,7 @@ class AlignFeaturesToColumnSchemaTransformer(object):
     def transform(self, referral_table):
         X = referral_table.reindex(self.column_schema, axis=1)
         y = referral_table['TimeFeature_FutureReferralScore']
-        return X, y, referral_table[self.to_drop]
+        return X.fillna(0), y.fillna(0), referral_table[self.to_drop]
 
 class FullTransformer(object):
     def __init__(self, features_to_split, column_schema):
@@ -286,8 +291,11 @@ class TrainingDataGenerator(object):
     def __init__(self, database_path):
         self.con = sqlite3.connect(database_path)
 
-    def get_training_data(self, limit=200):
+    def get_training_data(self, limit=None):
         tables_dict = {k: pd.read_sql(v, con=self.con) for k, v in self.SQL_DICT.items()}
-        tables_dict['Referral'] = (tables_dict['Referral'][tables_dict['Referral']
-                                            ['ReferralInstanceId'] < limit])
+
+        if limit is not None:
+            tables_dict['Referral'] = (tables_dict['Referral'][tables_dict['Referral']
+                                                ['ReferralInstanceId'] < limit])
+
         return tables_dict
