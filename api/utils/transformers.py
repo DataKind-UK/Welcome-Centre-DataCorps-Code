@@ -12,9 +12,40 @@ class BaseTransformer(object):
         pass
 
 class TimeFeatureTransformer(BaseTransformer):
-    def fit_transform(self, X):
-        pass
+    def __init__(self, break_length):
+        self.break_length = break_length
 
+    def fit_transform(self, referral_table):
+        # We set the start date to ensure consistent frame of reference
+        # across training and live data
+        self.dataset_start_date = referral_table['Referral_ReferralTakenDate'].min()
+        return self.transform(referral_table)
+
+    def transform(self, referral_table):
+        valid_referrals = (referral_table[referral_table['Referral_ReferralTakenDate']
+                            >= self.dataset_start_date].copy())
+        valid_referrals['TimeFeature_ReferralNumber'] =( valid_referrals
+                                                        .groupby('Referral_ClientId')
+                                                        ['Referral_ReferralTakenDate'].rank())
+        referral_table['TimeFeature_ReferralNumber'] = (valid_referrals['TimeFeature_ReferralNumber']
+                                                        .loc[referral_table.index])
+        # Add burst features
+        referral_table = referral_table.sort_values('Referral_ReferralTakenDate')
+        referral_table['TimeFeature_DaysSinceLastReferral'] = (referral_table.groupby('Referral_ClientId')
+                                                    ['Referral_ReferralTakenDate'].diff().dt.days
+                                                    .fillna(0))
+        referral_table['TimeFeature_StartOfBurst'] = (referral_table['TimeFeature_DaysSinceLastReferral']
+                                                      > self.break_length)
+        referral_table['TimeFeature_BurstNumber'] = (referral_table.groupby('Referral_ClientId')
+                                                    ['TimeFeature_StartOfBurst'].cumsum() + 1)
+        referral_table['TimeFeature_IndexInBurst'] = (referral_table.groupby(
+                                    ['Referral_ClientId', 'TimeFeature_BurstNumber'])
+                                        ['Referral_ReferralTakenDate'].rank())
+        ## Add a total referrals per client column - this can be used for sample weighting
+        client_count = referral_table.groupby('Referral_ClientId')[['Referral_ReferralTakenDate']].count()
+        client_count = client_count.rename(columns={'Referral_ReferralTakenDate':'TimeFeature_TotalReferralsForClient'})
+        referral_table = referral_table.merge(client_count, left_on='Referral_ClientId', right_index=True)
+        return referral_table
 
 class ConsolidateTablesTransformer(BaseTransformer):
     """This transformer takes the dictionary of tables and produces a master referral table"""
@@ -111,7 +142,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
                                             right_on='Client_ClientId', how='left')
         return master_table
 
-class AddTimeFeaturesTransformer(BaseTransformer):
+class AddFutureReferralTargetFeatures(BaseTransformer):
     def __init__(self, window=365, break_length=28, break_coefficients=1):
         self.window = window
         self.break_length = break_length
@@ -127,7 +158,6 @@ class AddTimeFeaturesTransformer(BaseTransformer):
         all_ratios = []
         referral_no = referrals.assign(count=1).groupby('Referral_ClientId').expanding()['count'].sum()
         referral_no = referral_no.reset_index().set_index('level_1')['count']
-        referrals['TimeFeature_ReferralNumber'] = referral_no.loc[referrals.index]
         for i in tqdm(range(1, int(referral_no.max()))):
             # Grab the segment for each no of referrals
             segment = referrals.loc[referral_no == i, :]
@@ -144,8 +174,9 @@ class AddTimeFeaturesTransformer(BaseTransformer):
             future_referral_score = (counts - gaps * break_coefficient) / (window / 7)
             segment_ratios = pd.concat([counts, future_referral_score, gaps],
                                        axis=1).loc[segment['Referral_ClientId']]
-            segment_ratios.columns = ['TimeFeature_FutureReferralCount', 'TimeFeature_FutureReferralScore',
-                                      'TimeFeature_FutureReferralGaps']
+            segment_ratios.columns = ['FutureReferralTargetFeature_FutureReferralCount',
+                                        'FutureReferralTargetFeature_FutureReferralScore',
+                                        'FutureReferralTargetFeature_FutureReferralGaps']
             segment_ratios.index = segment.index
             all_ratios.append(segment_ratios)
         all_ratios_df = pd.concat(all_ratios).reindex(referrals.index)
@@ -181,8 +212,6 @@ class SplitCurrentAndEverTransformer(BaseTransformer):
         return pd.concat([referral_table, current_features.add_suffix('_Current'),
                           any_features.add_suffix('_Ever')], axis=1)
 
-
-
 class AlignFeaturesToColumnSchemaTransformer(object):
     """This transformer takes the column schema defined by the model and
         selects the features from the referral table using this schema
@@ -199,10 +228,14 @@ class AlignFeaturesToColumnSchemaTransformer(object):
        'Referral_ReferralAgencyTelephoneNumber', 'Referral_DietaryExtraNotes',
        'Referral_ReferralNotes', 'Referral_UpdateTimeStamp']
 
-    to_drop += ['Referral_ClientId', 'Client_ClientId', 'reference_date']
+    to_drop += ['Client_ClientId', 'reference_date']
 
-    to_drop += ['TimeFeature_ReferralNumber', 'TimeFeature_FutureReferralCount',
-       'TimeFeature_FutureReferralScore', 'TimeFeature_FutureReferralGaps']
+    to_drop += ['FutureReferralTargetFeature_FutureReferralCount',
+                'FutureReferralTargetFeature_FutureReferralScore',
+                'FutureReferralTargetFeature_FutureReferralGaps']
+
+    to_drop += ['TimeFeature_TotalReferralsForClient', 'TimeFeature_StartOfBurst',
+                'TimeFeature_BurstNumber']
 
 
     def __init__(self):
@@ -214,7 +247,7 @@ class AlignFeaturesToColumnSchemaTransformer(object):
 
     def transform(self, referral_table):
         X = referral_table.reindex(self.column_schema, axis=1)
-        y = referral_table['TimeFeature_FutureReferralScore']
+        y = referral_table['FutureReferralTargetFeature_FutureReferralScore']
         return X.fillna(0), y.fillna(0), referral_table[self.to_drop]
 
 class FullTransformer(object):
