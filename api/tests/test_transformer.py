@@ -1,12 +1,16 @@
 from unittest import TestCase
 from api.utils.transformers import *
-
+import os
 consolidate = ConsolidateTablesTransformer()
-add_time_features = AddTimeFeaturesTransformer()
+add_target_features = AddFutureReferralTargetFeatures()
+add_time_window_features = TimeWindowFeatures(windows=[10, 2])
 split_current_and_ever = SplitCurrentAndEverTransformer(['ClientIssue_'])
 align = AlignFeaturesToColumnSchemaTransformer()
 
-data_gen = TrainingDataGenerator('../Welcome-Centre-DataCorps-Data/ClientDatabaseStructure.mdb.sqlite')
+db_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                       '..', '..', '..', 'Welcome-Centre-DataCorps-Data', 'ClientDatabaseStructure.mdb.sqlite')
+
+data_gen = TrainingDataGenerator(db_path)
 data = data_gen.get_training_data(1000)
 limited_data = data.copy()
 limited_data['Referral'] = limited_data['Referral'][limited_data['Referral']['ClientId'] == 287]
@@ -17,7 +21,7 @@ class TestTransformer(TestCase):
     def setUp(self):
         self.transformer = TransformerPipeline([
             consolidate,
-            add_time_features,
+            add_target_features,
             split_current_and_ever,
         ], align)
 
@@ -38,3 +42,17 @@ class TestTransformer(TestCase):
         X, y, referral_table = self.transformer.fit_transform(data)
         self.assertGreater(X.filter(like='_Current').shape[1], 0)
         self.assertGreater(X.filter(like='_Ever').shape[1], 0)
+
+
+class TestTimeWindowFeatures(TestCase):
+    def setUp(self):
+        self.transformer = TransformerPipeline([
+            consolidate,
+            add_target_features,
+            add_time_window_features
+        ], align)
+
+    def test_time_window_settings(self):
+        X, y, referral_table = self.transformer.fit_transform(data)
+        self.assertEqual(X.filter(like='window_count').shape[1], 2)
+        self.assertTrue((X['window_count_2'] <= X['window_count_10']).all())

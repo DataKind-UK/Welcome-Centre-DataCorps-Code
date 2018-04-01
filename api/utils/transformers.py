@@ -234,8 +234,10 @@ class AlignFeaturesToColumnSchemaTransformer(object):
                 'FutureReferralTargetFeature_FutureReferralScore',
                 'FutureReferralTargetFeature_FutureReferralGaps']
 
-    to_drop += ['TimeFeature_TotalReferralsForClient', 'TimeFeature_StartOfBurst',
-                'TimeFeature_BurstNumber']
+    to_drop += ['weeks']
+
+    to_drop += ['TimeFeature_TotalReferralsForClient',
+                'TimeFeature_BurstNumber', 'TimeFeature_ReferralNumber']
 
 
     def __init__(self):
@@ -250,7 +252,7 @@ class AlignFeaturesToColumnSchemaTransformer(object):
         y = referral_table['FutureReferralTargetFeature_FutureReferralScore']
         return X.fillna(0), y.fillna(0), referral_table[self.to_drop]
 
-class FullTransformer(object):
+class FullTransformer(BaseTransformer):
     def __init__(self, features_to_split, column_schema):
         self.column_schema = column_schema
         self.features_to_split = features_to_split
@@ -261,7 +263,7 @@ class FullTransformer(object):
 
     def transform(self, tables_dict):
         consolidate = ConsolidateTablesTransformer()
-        add_time_features = AddTimeFeaturesTransformer()
+        add_time_features = AddFutureReferralTargetFeatures()
         split_current_and_ever = SplitCurrentAndEverTransformer(self.features_to_split)
         align = AlignFeaturesToColumnSchemaTransformer(self.column_schema)
         referral_table = consolidate.fit_transform(tables_dict)
@@ -269,6 +271,36 @@ class FullTransformer(object):
         referral_table = split_current_and_ever.fit_transform(referral_table)
         X, y, referral_table = align.fit_transform(referral_table)
         return X, y, referral_table
+
+class TimeWindowFeatures(BaseTransformer):
+    def __init__(self, windows):
+        self.windows = windows
+
+    def get_rolling_count(self, referrals, window_size=10):
+        unrolled = referrals.set_index('Referral_ReferralTakenDate').groupby('Client_ClientId').apply(
+            lambda k: k.groupby(pd.TimeGrouper('1W', convention='e')).size())
+
+        referrals['weeks'] = referrals['Referral_ReferralTakenDate'] - pd.to_timedelta(
+            referrals['Referral_ReferralTakenDate'].dt.dayofweek, unit='d') + pd.to_timedelta(6, unit='d')
+        referrals['weeks'] = pd.to_datetime(referrals['weeks'].dt.date)
+
+        weighted = unrolled.groupby('Client_ClientId').apply(lambda k: k.rolling(window=window_size, min_periods=1)
+                                                             .sum().shift(1)).reset_index()
+
+        return referrals.merge(weighted, right_on=['Client_ClientId', 'Referral_ReferralTakenDate'], left_on=['Client_ClientId', 'weeks']) \
+            .set_index(referrals.index)[0].fillna(0)
+
+    def get_all_rolling_counts(self, windows, referrals):
+        df = pd.DataFrame(index=referrals.index)
+        for i in windows:
+            ewm = self.get_rolling_count(referrals, i)
+            df['window_count_{}'.format(i)] = ewm
+        return df
+
+    def fit_transform(self, X):
+        time_features = self.get_all_rolling_counts(self.windows, X)
+        return pd.concat([X, time_features], axis=1)
+
 
 class TransformerPipeline(BaseTransformer):
     def __init__(self, steps, aligner):
