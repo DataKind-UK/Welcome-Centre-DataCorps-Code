@@ -250,7 +250,7 @@ class AlignFeaturesToColumnSchemaTransformer(object):
     def transform(self, referral_table):
         X = referral_table.reindex(self.column_schema, axis=1)
         y = referral_table['FutureReferralTargetFeature_FutureReferralScore']
-        return X.fillna(0), y.fillna(0), referral_table[self.to_drop]
+        return X.fillna(0), y.fillna(0), referral_table.drop(X.columns, axis=1, errors='ignore')
 
 class FullTransformer(BaseTransformer):
     def __init__(self, features_to_split, column_schema):
@@ -279,16 +279,21 @@ class TimeWindowFeatures(BaseTransformer):
     def get_rolling_count(self, referrals, window_size=10):
         unrolled = referrals.set_index('Referral_ReferralTakenDate').groupby('Client_ClientId').apply(
             lambda k: k.groupby(pd.TimeGrouper('1W', convention='e')).size())
-
+        # if only one client, split-apply-combine returns strange shape
+        if unrolled.index.name == 'Client_ClientId':
+            unrolled = unrolled.T
+            unrolled['Client_ClientId'] = unrolled.columns[0]
+            unrolled.columns = [0, 'Client_ClientId']
         referrals['weeks'] = referrals['Referral_ReferralTakenDate'] - pd.to_timedelta(
             referrals['Referral_ReferralTakenDate'].dt.dayofweek, unit='d') + pd.to_timedelta(6, unit='d')
         referrals['weeks'] = pd.to_datetime(referrals['weeks'].dt.date)
 
         weighted = unrolled.groupby('Client_ClientId').apply(lambda k: k.rolling(window=window_size, min_periods=1)
-                                                             .sum().shift(1)).reset_index()
+                                                             .sum()).reset_index()
 
-        return referrals.merge(weighted, right_on=['Client_ClientId', 'Referral_ReferralTakenDate'], left_on=['Client_ClientId', 'weeks']) \
-            .set_index(referrals.index)[0].fillna(0)
+        merged = referrals.merge(weighted, right_on=['Client_ClientId', 'Referral_ReferralTakenDate'],
+                                 left_on=['Client_ClientId', 'weeks'])[0].fillna(0)
+        return merged
 
     def get_all_rolling_counts(self, windows, referrals):
         df = pd.DataFrame(index=referrals.index)
@@ -301,24 +306,36 @@ class TimeWindowFeatures(BaseTransformer):
         time_features = self.get_all_rolling_counts(self.windows, X)
         return pd.concat([X, time_features], axis=1)
 
+    def transform(self, X):
+        return self.fit_transform(X)
+
 
 class TransformerPipeline(BaseTransformer):
     def __init__(self, steps, aligner):
         self.pipeline = steps
         self.aligner = aligner
 
-    def transform(self, X):
+    def fit_transform(self, X):
         for transformer in self.pipeline:
             X = transformer.fit_transform(X)
 
         return self.aligner.fit_transform(X)
 
+    def transform(self, X):
+        for transformer in self.pipeline:
+            X = transformer.transform(X)
+
+        return self.aligner.transform(X)
+
 class ParseJSONToTablesTransformer(BaseTransformer):
     """This transformer takes the json from the request
     and turns it into a dictionary of tables"""
 
-    def transform(self, request_json_string):
-        json_data = json.loads(request_json_string)
+    def transform(self, req_json):
+        if type(req_json) == str:
+            json_data = json.loads(req_json)
+        else:
+            json_data = req_json
         tables_dict = {}
         for k, v in json_data.items():
             if v:
