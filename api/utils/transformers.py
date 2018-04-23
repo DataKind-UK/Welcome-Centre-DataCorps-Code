@@ -65,10 +65,16 @@ class ConsolidateTablesTransformer(BaseTransformer):
     'ReferralDocument': ('ReferralInstanceId','ReferralDocumentId'),
     }
 
+    def __init__(self, count_encode):
+        self.count_encode = count_encode
+
     def transform(self, tables):
-        rt = self.generate_master_referral_table(tables)        
+        rt = self.generate_master_referral_table(tables, training=False)
         return rt
-        
+
+    def fit_transform(self, tables):
+        rt = self.generate_master_referral_table(tables, training=True)
+        return rt
         
     def process_referral_table(self, referral_table):
         referral_table['ReferralTakenDate'] = pd.to_datetime(referral_table['ReferralTakenDate'])
@@ -76,7 +82,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
         referral_table = referral_table.add_prefix('Referral_')
         return referral_table
     
-    def process_client_table(self, client_table):
+    def process_client_table(self, client_table, training=True):
         client_table['ClientDateOfBirth'] = pd.to_datetime(client_table['ClientDateOfBirth'])
         client_table['AddressSinceDate'] = pd.to_datetime(client_table['AddressSinceDate'])
         client_table['Age'] = datetime.now() - client_table['ClientDateOfBirth']
@@ -88,15 +94,24 @@ class ConsolidateTablesTransformer(BaseTransformer):
 
         dummied_cols = ['ClientEthnicityID', 'ClientCountryID', 'ClientAddressTypeID', 
                         'AddressPostCode', 'AddressLocalityId', 'ClientResidencyId']
-        categories = pd.get_dummies(client_table[dummied_cols].astype(str),
-                                   prefix=dummied_cols,
-                                   prefix_sep='_')
+        client_table[dummied_cols] = client_table[dummied_cols].astype(str)
+        if self.count_encode:
+            if training:
+                self.replacements = {col: client_table[col].replace(client_table[col].value_counts()) for col in dummied_cols}
+
+            categories = pd.get_dummies(client_table.assign(**self.replacements)[dummied_cols],
+                                        columns=dummied_cols,
+                                        prefix_sep='_')
+        else:
+            categories = pd.get_dummies(client_table[dummied_cols],
+                                       columns=dummied_cols,
+                                       prefix_sep='_')
         variables = ['Age', 'AddressLength', 'ClientIsMale', 'KnownPartner', 'ClientId']
         client_table = pd.concat([client_table[variables], categories], axis=1)
         client_table = client_table.add_prefix('Client_')
         return client_table
     
-    def generate_master_referral_table(self, tables):
+    def generate_master_referral_table(self, tables, training=True):
         # Check all the correct table entries are there
         for t in self.REQUIRED_TABLES:
             try:
@@ -117,7 +132,15 @@ class ConsolidateTablesTransformer(BaseTransformer):
         flat_tables = {}
         for key in self.FLATTEN_TABLES_COLUMN_MAPPING.keys():
             if not tables[key].empty:
-                flat_table = (tables[key].groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
+                if self.count_encode:
+                    item_id = self.FLATTEN_TABLES_COLUMN_MAPPING[key][1]
+                    if training:
+                        self.encoding = tables[key][item_id].replace(tables[key].groupby(item_id).size())
+
+                    flat_table = (tables[key].assign(**{item_id: self.encoding}).groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
+                                                .size().unstack().add_prefix(key + '_'))
+                else:
+                    flat_table = (tables[key].groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
                                                 .size().unstack().add_prefix(key + '_'))
                 referral_table = referral_table.merge(flat_table, left_index=True,
                                                       right_index=True, how='left')
@@ -244,7 +267,7 @@ class AlignFeaturesToColumnSchemaTransformer(object):
         self.column_schema = None
         
     def fit_transform(self, referral_table):
-        self.column_schema = list(referral_table.drop(self.to_drop, axis=1).columns)
+        self.column_schema = list(referral_table.drop(self.to_drop, axis=1, errors='ignore').columns)
         return self.transform(referral_table)
 
     def transform(self, referral_table):

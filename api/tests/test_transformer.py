@@ -1,7 +1,7 @@
 from unittest import TestCase
 from api.utils.transformers import *
 import os
-consolidate = ConsolidateTablesTransformer()
+consolidate = ConsolidateTablesTransformer(count_encode=False)
 add_target_features = AddFutureReferralTargetFeatures()
 add_time_window_features = TimeWindowFeatures(windows=[10, 2])
 split_current_and_ever = SplitCurrentAndEverTransformer(['ClientIssue_'])
@@ -42,6 +42,24 @@ class TestTransformer(TestCase):
         X, y, referral_table = self.transformer.fit_transform(data)
         self.assertGreater(X.filter(like='_Current').shape[1], 0)
         self.assertGreater(X.filter(like='_Ever').shape[1], 0)
+
+class TestCountEncoding(TestCase):
+    def test_count_encoder_reduces_dims(self):
+        transformer = TransformerPipeline([
+            ConsolidateTablesTransformer(count_encode=False),
+            add_target_features
+        ], align)
+        X, _, _ = transformer.fit_transform(data)
+        one_hot_shape = X.shape[1]
+        print(X.shape)
+        transformer = TransformerPipeline([
+            ConsolidateTablesTransformer(count_encode=True),
+            add_target_features
+        ], align)
+        X, _, _ = transformer.fit_transform(data)
+        print(X.shape)
+        encoded_shape = X.shape[1]
+        self.assertGreater(one_hot_shape, encoded_shape)
 
 
 class TestTimeWindowFeatures(TestCase):
