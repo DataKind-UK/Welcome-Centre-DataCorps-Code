@@ -16,10 +16,10 @@ This needs to take place when volunteers are speaking to them on the phone and e
 
 ### Overview of the model
 
-#### [Dependency issue - Lucy]
-#### [What the model predicts, dependency score, 1 year window etc. - ???]
-* 
+* Dependency issue - Lucy]
+* What the model predicts, dependency score, 1 year window etc. - ???]
 
 ### Technical detail
 
 ### Guide to installation/setup
+
