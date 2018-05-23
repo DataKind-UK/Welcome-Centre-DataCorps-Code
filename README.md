@@ -8,6 +8,18 @@ Identifying those in need of support is challenging, and compounded by the fact 
 
 ### Aims of the project
 
+To develop an automated method for identifying those clients who should be referred to the support worker. 
 
+This needs to take place when volunteers are speaking to them on the phone and entering information into the client database. 
 
-### 
+[Lucy to expand]
+
+### Overview of the model
+
+* [Dependency issue - Lucy]
+* [What the model predicts, dependency score, 1 year window etc. - ???]
+* 
+
+### Technical detail
+
+### Guide to installation/setup
