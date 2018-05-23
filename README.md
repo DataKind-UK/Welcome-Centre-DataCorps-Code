@@ -16,10 +16,24 @@ This needs to take place when volunteers are speaking to them on the phone and e
 
 ### Overview of the model
 
-* Dependency issue - Lucy]
-* What the model predicts, dependency score, 1 year window etc. - ???]
+* [Dependency issue - Lucy]
+
+Lucy notes
+  * Initial view = more referrals (referrals>x) determine dependency
+  * But challenges: 1)Our observation history for each client is a different length 2) Trade-off between referral number and saturation
+  * And have information on gaps between referals
+  * Dependency Score = (Number of Referrals in next 12 months - Number of Gaps) / 52
+  * Gap = period longer than 28 days - want to penalise sustained unbroken usage.
+
+
+  
+
+* [What the model predicts, dependency score, 1 year window etc. - ???]
+* [High-level what the model is and why it is a sensible choice]
 
 ### Technical detail
+
+
 
 ### Guide to installation/setup
 
