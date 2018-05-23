@@ -25,11 +25,10 @@ This needs to take place when volunteers are speaking to them on the phone and e
     * Dependency Score = (Number of Referrals in next 12 months - Number of Gaps) / 52
     * Gap = period longer than 28 days - want to penalise sustained unbroken usage.
     * A fraction between 0 and 1 where a score of 1 would be a referral a week for a year.
-* [High-level what the model is and why it is a sensible choice]
+    
+* [High-level what the model is and why it is a sensible choice - ???]
 
 ### Technical detail
-
-
 
 ### Guide to installation/setup
 
