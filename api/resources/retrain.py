@@ -57,9 +57,9 @@ def generate_X_y(tables):
                         ConsolidateTablesTransformer(count_encode=False),
                         AddFutureReferralTargetFeatures(),
                         TimeFeatureTransformer(break_length=28),
-                        SplitCurrentAndEverTransformer(['ReferralIssue_', 
-                                                       'ReferralDomesticCircumstances_',
-                                                        'ReferralReason_', 'ReferralBenefit_'])
+                        SplitCurrentAndEverTransformer(['referralissue_', 
+                                                       'referraldomesticcircumstances_',
+                                                        'referralreason_', 'referralbenefit_'])
                                     ], aligner=AlignFeaturesToColumnSchemaTransformer())
     X, y, referral_table = transformer.fit_transform(tables)
     # Since the data is all numerical or dummied we can fill any nulls with 0

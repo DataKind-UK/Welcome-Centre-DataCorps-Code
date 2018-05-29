@@ -377,24 +377,24 @@ class ParseJSONToTablesTransformer(BaseTransformer):
 class TrainingDataGenerator(object):
     SQL_DICT = {'referral': """SELECT * FROM referral;""",
                 
-                'Client': """SELECT * FROM Client;""",
+                'client': """SELECT * FROM Client;""",
                 
                 'referralbenefit':"""SELECT ref_dim.* FROM referralbenefit as ref_dim
                 LEFT JOIN  referral on referral.referralinstanceid = ref_dim.referralinstanceid;""",
                 
-                'referraldietaryRequirements':"""SELECT ref_dim.* FROM referraldietaryRequirements as ref_dim
+                'referraldietaryrequirements':"""SELECT ref_dim.* FROM referraldietaryRequirements as ref_dim
                 LEFT JOIN  referral on referral.referralinstanceid = ref_dim.referralinstanceid;""",
 
                 'referraldocument':"""SELECT ref_dim.* FROM referraldocument as ref_dim
                 LEFT JOIN  referral on referral.referralinstanceid = ref_dim.referralinstanceid;""",
 
-                'referralDomesticCircumstances': """SELECT ref_dim.* FROM referralDomesticCircumstances as ref_dim
+                'referraldomesticcircumstances': """SELECT ref_dim.* FROM referralDomesticCircumstances as ref_dim
                 LEFT JOIN  referral on referral.referralinstanceid = ref_dim.referralinstanceid;""",
 
-                'referralIssue':"""SELECT ref_dim.* FROM referralIssue as ref_dim
+                'referralissue':"""SELECT ref_dim.* FROM referralIssue as ref_dim
                 LEFT JOIN  referral on referral.referralinstanceid = ref_dim.referralinstanceid;""",
 
-                'referralReason': """SELECT ref_dim.* FROM referralReason as ref_dim
+                'referralreason': """SELECT ref_dim.* FROM referralReason as ref_dim
                 LEFT JOIN  referral on referral.referralinstanceid = ref_dim.referralinstanceid;""",
 
                 'clientissue': """SELECT * FROM clientissue;"""
@@ -405,6 +405,8 @@ class TrainingDataGenerator(object):
 
     def get_training_data(self, limit=None):
         tables_dict = {k: pd.read_sql(v, con=self.con) for k, v in self.SQL_DICT.items()}
+        for k, t in tables_dict.items():
+            t.columns = [c.lower() for c in t.columns]
 
         if limit is not None:
             tables_dict['referral'] = (tables_dict['referral'][tables_dict['referral']

@@ -11,7 +11,7 @@ import os
 class Score(Resource):
     def __init__(self, api, *args, **kwargs):
         self.model = TWCModel()
-        self.model.load(os.getenv('MODEL_PATH', 'model.p'))
+        self.model.load(os.getenv('MODEL_PATH', 'etmodel.p'))
         self.parser = ParseJSONToTablesTransformer()
         super().__init__(api, *args, **kwargs)
 
