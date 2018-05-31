@@ -1,0 +1,11 @@
+{
+    "dev": {
+        "app_function": "twc_api.app",
+        "aws_region": "eu-west-1",
+        "profile_name": "twc",
+        "project_name": "lambda-api",
+        "runtime": "python3.6",
+        "s3_bucket": "twc-lambda-api-test",
+        "slim_handler": true
+    }
+}
