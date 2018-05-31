@@ -1,0 +1,31 @@
+// This file defines the reponse format for the API
+// It follows the specification outlined here https://labs.omniti.com/labs/jsend
+
+// Sucessful Status
+{
+    "status": "success",
+    "data":{
+        "id": 15739,
+        "score": 0.65,
+        "modelVersion": "v1.0"
+    }
+}
+
+// Fail Status - where the model failed to validate data - this is just an example and may change
+
+{
+    "status": "fail",
+    "data":{
+        "Referral_ReferralTakenDate": "Not a valid date format"
+    }
+}
+
+// Error Status - where the server returns an error
+
+{  
+   "status":"error",
+   "message":"500",
+   "data":{  
+      "stackTrace":""
+   }
+}
