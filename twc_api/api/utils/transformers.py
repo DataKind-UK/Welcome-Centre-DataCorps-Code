@@ -1,5 +1,5 @@
 import pandas as pd
-from tqdm import tqdm
+# from tqdm import tqdm
 from datetime import datetime
 import json
 import sqlite3
@@ -189,7 +189,7 @@ class AddFutureReferralTargetFeatures(BaseTransformer):
         all_ratios = []
         referral_no = referrals.assign(count=1).groupby('referral_clientid').expanding()['count'].sum()
         referral_no = referral_no.reset_index().set_index('level_1')['count']
-        for i in tqdm(range(1, int(referral_no.max()))):
+        for i in range(1, int(referral_no.max())):
             # Grab the segment for each no of referrals
             segment = referrals.loc[referral_no == i, :]
             reference_date = segment.set_index('referral_clientid')['referral_referraltakendate']
