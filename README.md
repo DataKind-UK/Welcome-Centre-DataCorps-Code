@@ -30,7 +30,8 @@ Just to give some flavour as to why only considering (1) (the number of referral
 Another approach we considered was a definition of dependency of X number of referrals in Y months. However, choosing the number of referrals and the time period was not straightforward. For example, consider 2 people with 6 referrals in 3 months: Person one has 6 referrals over a 6 week period and Person 2 has 2 referrals at the beginning of 3 months, then a 4 week break, then 4 more referrals. Should there be a difference in dependency score? This approach didn't allow for understanding the gaps between referrals over a long enough period.
 
 Our approach was to take information on both the referral numbers and time between referrals over the past 12 months of a client. We created our dependency score as:
-Dependency Score = (Number of Referrals in next 12 months - Number of Gaps) / 52
+
+**Dependency Score = (Number of Referrals in next 12 months - Number of Gaps) / 52**
 
 This results in a dependency score between 0 and 1, with 1 indicating referrals for all 52 weeks in the year.
 
@@ -50,7 +51,7 @@ There was data available for teh past 3 years of TWC activity. This data covered
 3. Hitorical referral characteristics
 4. Current referral
 
-![Overview of data features](url)
+![Overview of data features](https://github.com/DataKind-UK/Welcome-Centre-DataCorps-Code/blob/lucydocbranch/summary%20of%20data.PNG)
 
 ### Modeling Approach
 
