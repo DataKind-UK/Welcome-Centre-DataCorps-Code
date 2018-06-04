@@ -44,6 +44,14 @@ One disadvantage of this definition of dependence is the complexity and interpre
     
 ### Data available
 
+There was data available for teh past 3 years of TWC activity. This data covered client’s history of referrals, client issues, referral issues and personal characteristics. Tis data was used to create features in 4 areas:
+1. Client characteristics
+2. Referral history pattern
+3. Hitorical referral characteristics
+4. Current referral
+
+![Overview of data features](url)
+
 ### Modeling Approach
 
 Every time a client is referred, the model will predict the dependency score based on the client’s history of referrals, client issues, referral issues and personal characteristics.
