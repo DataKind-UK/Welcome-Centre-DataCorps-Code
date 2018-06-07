@@ -31,11 +31,15 @@ class TWCModel(object):
             pickle.dump({'transformer': self.transformer,
                         'model': self.model}, file)
 
-    def load(self, file_name):
+    def load_from_file(self, file_name):
         with open(file_name, 'rb') as file:
             manifest = pickle.load(file)
             self.transformer = manifest['transformer']
             self.model = manifest['model']
+
+    def load_from_object(self, model_object):
+        self.transformer = model_object.transformer
+        self.model = model_object.model
 
 if __name__ == '__main__':
     data_gen = TrainingDataGenerator('../../../Welcome-Centre-DataCorps-Data/ClientDatabaseStructure.mdb.sqlite')
