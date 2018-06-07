@@ -12,7 +12,7 @@ class TestScore(TestCase):
         json_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         with open(os.path.join(json_path, 'request1872.json'), 'r') as f:
             self.json_data = json.load(f)
-        self.url = 'http://localhost:8080/score'
+        self.url = 'http://localhost:5000/score'
         r = requests.post(self.url, json=self.json_data)
         print(r.json())
         self.assertTrue(r.status_code == 200)
