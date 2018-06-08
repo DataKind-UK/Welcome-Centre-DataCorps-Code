@@ -88,7 +88,7 @@ def set_model(version):
         raise ModelNotFound()
     else:
         new_entry = {
-            'current_version': version,
+            'current_version': int(version),
             'timestamp': str(datetime.datetime.now())
         }
         status = get_status()
