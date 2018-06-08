@@ -34,6 +34,11 @@ class Status(Resource):
         status = get_status()
         return status
 
+@api.route('/current-model')
+class Status(Resource):
+    def get(self):
+        return get_current_model_key()
+
 @api.route('/score')
 class Score(Resource):
     def __init__(self, api, *args, **kwargs):
