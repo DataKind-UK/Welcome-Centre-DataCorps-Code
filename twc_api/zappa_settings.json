@@ -6,7 +6,7 @@
         "project_name": "api",
         "runtime": "python3.6",
         "s3_bucket": "twc-lambda-api",
-        "slim_handler": true
-
+        "slim_handler": true,
+        "memory_size": 2048
     }
 }

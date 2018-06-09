@@ -18,11 +18,8 @@ MODEL_ROOT_NAME = 'twc_model_'
 if 'SERVERTYPE' in os.environ and os.environ['SERVERTYPE'] == 'AWS Lambda':
     sess = boto3.Session()
 else:
-    sess = boto3.Session(
-        region_name='eu-west-2',
-        aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
-    )
+    sess = boto3.Session()
+
 s3 = sess.resource('s3')
 
 def bucket_name():
