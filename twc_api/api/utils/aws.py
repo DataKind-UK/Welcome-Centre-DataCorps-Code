@@ -6,6 +6,7 @@ import os
 import tempfile
 import pickle
 import json
+from io import BytesIO
 
 import shutil
 from botocore.exceptions import ClientError
@@ -14,11 +15,14 @@ from flask import current_app
 STATUS_FILE_NAME = 'twc_status'
 MODEL_ROOT_NAME = 'twc_model_'
 
-sess = boto3.Session(
-    region_name='eu-west-2',
-    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
-)
+if 'SERVERTYPE' in os.environ and os.environ['SERVERTYPE'] == 'AWS Lambda':
+    sess = boto3.Session()
+else:
+    sess = boto3.Session(
+        region_name='eu-west-2',
+        aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+    )
 s3 = sess.resource('s3')
 
 def bucket_name():
@@ -64,6 +68,7 @@ def save_model(model, version=None):
     upload_file_to_bucket(tf.name, bucket_name(), MODEL_ROOT_NAME + str(next_version))
     os.remove(tf.name)
 
+
 def get_status():
     try:
         file_content = s3.Object(bucket_name(), STATUS_FILE_NAME).get()['Body'].read().decode('utf-8')
@@ -79,11 +84,11 @@ def get_status():
 
 def set_model(version):
     models = get_models()
-    if version not in models:
+    if int(version) not in models:
         raise ModelNotFound()
     else:
         new_entry = {
-            'current_version': version,
+            'current_version': int(version),
             'timestamp': str(datetime.datetime.now())
         }
         status = get_status()
@@ -94,7 +99,7 @@ def set_model(version):
         upload_file_to_bucket(file.name, bucket_name(), STATUS_FILE_NAME)
         os.remove(file.name)
 
-def get_current_model():
+def get_current_model_key():
     models = get_models()
     status = get_status()
 
@@ -111,3 +116,16 @@ def get_current_model():
         return models[current_version]['key']
     else:
         return models[max_model]['key']
+
+def load_model_into_memory(model_key):
+    b = BytesIO()
+    bucket = s3.Bucket(bucket_name())
+    bucket.download_fileobj(model_key, b)
+    b.seek(0)
+    model_dict = pickle.load(b)
+    return model_dict
+
+
+
+
+
