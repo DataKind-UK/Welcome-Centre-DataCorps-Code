@@ -14,18 +14,18 @@ api = Api(app, title='The Welcome Centre - DataKind API', default='Endpoints', d
 
 logging.getLogger('s3transfer').setLevel(logging.CRITICAL)
 
-def update_model():
-    current_model_key = get_current_model_key()
-    model_dict = load_model_into_memory(current_model_key)
-    model = TWCModel()
-    model.load_from_object(model_dict['model'])
-    return model
-
 class ModelContainer(object):
     current_model = None
+    current_version = None
 
-with app.app_context():
-    ModelContainer.current_model = update_model()
+def update_model():
+    current_model_key = get_current_model_key()
+    if ModelContainer.current_model != current_model_key:
+        app.logger.info('Model state changed, loading model')
+        model_dict = load_model_into_memory(current_model_key)
+        model = TWCModel()
+        model.load_from_object(model_dict['model'])
+        ModelContainer.current_model, ModelContainer.current_version = model, current_model_key
 
 @api.route('/set-model')
 @api.doc(description='Sets the live model version in the API',
@@ -59,10 +59,10 @@ class Score(Resource):
     def __init__(self, api, *args, **kwargs):
         self.parser = ParseJSONToTablesTransformer()
 
-
     def post(self):
         json_data = request.get_json(force=True)
         if type(json_data) == str:
             json_data = json.loads(json_data)
         tables = self.parser.transform(json_data)
+        update_model()
         return ModelContainer.current_model.predict(tables)[0]
