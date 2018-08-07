@@ -11,6 +11,34 @@ from api.utils.transformers import (TransformerPipeline, ConsolidateTablesTransf
                                     AlignFeaturesToColumnSchemaTransformer)
 from sklearn.ensemble import ExtraTreesRegressor
 
+def train_model_from_json(json_data):
+    summary_statuses = []
+    tables = construct_full_tables(json_data)
+    # Generate feature matrix and target vector
+    X, y, referral_table, generation_summary = generate_X_y(tables)
+    summary_statuses.append(generation_summary)
+    # Split train and test sets
+    X_train, X_test, y_train, y_test, \
+    referral_table_train, referral_table_test, \
+    split_summary = split_train_test(X, y, referral_table)
+    summary_statuses.append(split_summary)
+    # Evaluate  model
+    new_model, training_status = train_model(X_train, y_train)
+    summary_statuses.append(training_status)
+    evaluation_summary = evaluate_model(new_model, X_test,
+                                        y_test, referral_table_test, 0.2)
+    summary_statuses.append(evaluation_summary)
+    return X, y, referral_table, new_model, '\n'.join(summary_statuses)
+
+    # Return Threshold
+    """PLACE HOLDER FOR CREATING A THRESHOLD/REFERRALS PER WEEK CURVE"""
+
+    # Train production model on all data
+    new_model, final_training_status = train_model(X, y)
+    summary_statuses.append(final_training_status)
+    print('\n'.join(summary_statuses))
+    return X, y, referral_table, new_model, '\n'.join(summary_statuses)
+
 
 @api.route('/retrain')
 class Retrain(Resource):
@@ -21,29 +49,8 @@ class Retrain(Resource):
         if type(json_data) == str:
             json_data = json.loads(json_data)
         # Construct dictionary of tables
-        tables = construct_full_tables(json_data)
-        # Generate feature matrix and target vector
-        X, y, referral_table, generation_summary = generate_X_y(tables)
-        summary_statuses.append(generation_summary)
-        # Split train and test sets
-        X_train, X_test, y_train, y_test,\
-        referral_table_train, referral_table_test,\
-        split_summary = split_train_test(X, y, referral_table)
-        summary_statuses.append(split_summary)
-        # Evaluate  model
-        new_model, training_status = train_model(X_train, y_train)
-        summary_statuses.append(training_status)
-        evaluation_summary = evaluate_model(new_model, X_test, y_test, referral_table_test, 0.2)
-        summary_statuses.append(evaluation_summary)
-
-        # Return Threshold
-        """PLACE HOLDER FOR CREATING A THRESHOLD/REFERRALS PER WEEK CURVE"""
-        
-        # Train production model on all data
-        new_model, final_training_status = train_model(X, y)
-        summary_statuses.append(final_training_status)
-        print('\n'.join(summary_statuses))
-        return '\n'.join(summary_statuses)
+        model, message = train_model_from_json(json_data)
+        return message
 
 def construct_full_tables(json_data):
     tables = defaultdict(list)
@@ -68,7 +75,7 @@ def generate_X_y(tables):
     " consisting of {} referrals and {} features".format(X.shape[0], X.shape[1])
     return X, y, referral_table, generation_summary
 
-def split_train_test(X, y, referral_table, test_proportion=0.2):
+def split_train_test(X, y, referral_table, test_proportion=0.25):
     max_index = len(X) - 1
     test_start = int((1-test_proportion)*max_index)
     X_train = X.iloc[0:test_start]
