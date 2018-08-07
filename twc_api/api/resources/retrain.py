@@ -25,8 +25,10 @@ def train_model_from_json(json_data):
     # Evaluate  model
     new_model, training_status = train_model(X_train, y_train)
     summary_statuses.append(training_status)
-    evaluation_summary = evaluate_model(new_model, X_test, y_test, referral_table_test, 0.2)
+    evaluation_summary = evaluate_model(new_model, X_test,
+                                        y_test, referral_table_test, 0.2)
     summary_statuses.append(evaluation_summary)
+    return X, y, referral_table, new_model, '\n'.join(summary_statuses)
 
     # Return Threshold
     """PLACE HOLDER FOR CREATING A THRESHOLD/REFERRALS PER WEEK CURVE"""
@@ -35,7 +37,7 @@ def train_model_from_json(json_data):
     new_model, final_training_status = train_model(X, y)
     summary_statuses.append(final_training_status)
     print('\n'.join(summary_statuses))
-    return new_model, '\n'.join(summary_statuses)
+    return X, y, referral_table, new_model, '\n'.join(summary_statuses)
 
 
 @api.route('/retrain')
@@ -73,7 +75,7 @@ def generate_X_y(tables):
     " consisting of {} referrals and {} features".format(X.shape[0], X.shape[1])
     return X, y, referral_table, generation_summary
 
-def split_train_test(X, y, referral_table, test_proportion=0.2):
+def split_train_test(X, y, referral_table, test_proportion=0.25):
     max_index = len(X) - 1
     test_start = int((1-test_proportion)*max_index)
     X_train = X.iloc[0:test_start]
