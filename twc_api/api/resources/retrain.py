@@ -69,6 +69,17 @@ def generate_X_y(tables):
                                                         'referralreason_', 'referralbenefit_'])
                                     ], aligner=AlignFeaturesToColumnSchemaTransformer())
     X, y, referral_table = transformer.fit_transform(tables)
+    max_dt = referral_table['referral_referraltakendate'].max()
+    # Need to clip the data to have at least a year of observation
+    last_acceptable_date = max_dt - pd.Timedelta('365 days')
+
+    X = X[referral_table['referral_referraltakendate'] <= last_acceptable_date]
+
+    y = y[referral_table['referral_referraltakendate'] <= last_acceptable_date]
+
+    referral_table = referral_table[referral_table['referral_referraltakendate'] 
+                                                    <= last_acceptable_date]
+                                                    
     # Since the data is all numerical or dummied we can fill any nulls with 0
     X = X.fillna(0)
     generation_summary = "Features Matrix generated" \
