@@ -78,7 +78,6 @@ class ConsolidateTablesTransformer(BaseTransformer):
         
     def process_referral_table(self, referral_table):
         referral_table['referraltakendate'] = pd.to_datetime(referral_table['referraltakendate'])
-        referral_table = referral_table.set_index('referralinstanceid')
         referral_table = referral_table.add_prefix('referral_')
         return referral_table
     
@@ -96,7 +95,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
         client_table['addresslength'] = (datetime.now() -
                                              client_table['addresssincedate']).dt.days / 365
 
-        dummied_cols = ['clientethnicityid', 'clientcountryid', 'clientaddresstypeid', 
+        dummied_cols = ['clientcountryid', 'clientaddresstypeid', 
                         'addresspostcode', 'addresslocalityid', 'clientresidencyid']
         client_table[dummied_cols] = client_table[dummied_cols].astype(str)
         if self.count_encode:
@@ -146,7 +145,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
                 else:
                     flat_table = (tables[key].groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
                                                 .size().unstack().add_prefix(key + '_'))
-                referral_table = referral_table.merge(flat_table, left_index=True,
+                referral_table = referral_table.merge(flat_table, left_on='referral_referralinstanceid',
                                                       right_index=True, how='left')
 
         # Get the Client Table and process
@@ -161,7 +160,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
             client_issue_table = tables['clientissue'].groupby(['clientid', 'clientissueid']).size().unstack()
             client_issue_table = client_issue_table.add_prefix('clientissue_')
             client_table = pd.merge(client_table, client_issue_table,
-                                    left_on='client_clientid', right_index=True)
+                                    left_on='client_clientid', right_index=True, how='left')
         else:
             pass
         
@@ -171,7 +170,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
 
         # Order by referral taken date - this is important for spliting the train/test sets
         master_table = master_table.sort_values('referral_referraltakendate')
-        return master_table
+        return master_table.set_index('referral_referralinstanceid')
 
 class AddFutureReferralTargetFeatures(BaseTransformer):
     def __init__(self, window=365, break_length=28, break_coefficients=1):
@@ -188,7 +187,7 @@ class AddFutureReferralTargetFeatures(BaseTransformer):
     def calc_look_ahead_stats(self, referrals, window=365, break_length=28, break_coefficient=1):
         all_ratios = []
         referral_no = referrals.assign(count=1).groupby('referral_clientid').expanding()['count'].sum()
-        referral_no = referral_no.reset_index().set_index('level_1')['count']
+        referral_no = referral_no.reset_index().set_index('referral_referralinstanceid')['count']
         for i in range(1, int(referral_no.max())):
             # Grab the segment for each no of referrals
             segment = referrals.loc[referral_no == i, :]
@@ -279,6 +278,7 @@ class AlignFeaturesToColumnSchemaTransformer(object):
         return self.transform(referral_table)
 
     def transform(self, referral_table):
+        referral_table = referral_table.sort_values('referral_referraltakendate')
         X = referral_table.reindex(self.column_schema, axis=1)
         y = referral_table['futurereferraltargetfeature_futurereferralscore']
         return X.fillna(0), y.fillna(0), referral_table.drop(X.columns, axis=1, errors='ignore')
