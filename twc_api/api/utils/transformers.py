@@ -95,8 +95,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
         client_table['addresslength'] = (datetime.now() -
                                              client_table['addresssincedate']).dt.days / 365
 
-        dummied_cols = ['clientcountryid', 'clientaddresstypeid', 
-                        'addresspostcode', 'addresslocalityid', 'clientresidencyid']
+        dummied_cols = ['clientcountryid', 'clientaddresstypeid', 'addresslocalityid', 'clientresidencyid']
         client_table[dummied_cols] = client_table[dummied_cols].astype(str)
         if self.count_encode:
             if training:
