@@ -5,7 +5,7 @@ from flask import request
 from flask_restplus import Resource
 from api import api
 import pandas as pd
-from api.utils.transformers import (TransformerPipeline, ConsolidateTablesTransformer,
+from api.model.transformers import (TransformerPipeline, ConsolidateTablesTransformer,
                                     AddFutureReferralTargetFeatures, TimeFeatureTransformer,
                                     SplitCurrentAndEverTransformer,
                                     AlignFeaturesToColumnSchemaTransformer)

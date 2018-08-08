@@ -3,8 +3,8 @@ from flask import request
 from flask_restplus import Api, Resource
 from api.utils.aws import (get_models, set_model, get_status,
                            get_current_model_key, load_model_into_memory)
-from api.utils.models import TWCModel
-from api.utils.transformers import ParseJSONToTablesTransformer
+from api.model.models import TWCModel
+from api.model.transformers import ParseJSONToTablesTransformer
 import json
 import logging
 

@@ -5,6 +5,10 @@ import json
 import sqlite3
 
 class BaseTransformer(object):
+    """Scikit-learn style transformer pattern, operating on a feature object X and returning a transformed version
+    fit_transform by default simply calls transform, but in stateful transformers, will contain code which calculates
+    and saves any state variables
+    """
     def fit_transform(self, X):
         return self.transform(X)
 
@@ -12,7 +16,15 @@ class BaseTransformer(object):
         pass
 
 class TimeFeatureTransformer(BaseTransformer):
+    """Appends time based features to the referral feature matrix, which encode the contextual information regarding
+    a particular referral relative to a particular client's historical use pattern. For example, what number referral
+    this is in a burst of high usage
+    """
     def __init__(self, break_length):
+        """
+
+        :param break_length: The length in days of no usage which defines the end of a high usage burst
+        """
         self.break_length = break_length
 
     def fit_transform(self, referral_table):
@@ -48,7 +60,10 @@ class TimeFeatureTransformer(BaseTransformer):
         return referral_table
 
 class ConsolidateTablesTransformer(BaseTransformer):
-    """This transformer takes the dictionary of tables and produces a master referral table"""
+    """This transformer takes the dictionary of tables, table_names: dataframes, and produces a master referral table
+    The index of the returned table is referral_instance_id, categorical variables are represented as one-hot vectors
+    and column order is saved so that transform acts consistently at test time"""
+
     REQUIRED_TABLES = [
                         'referral', 'referraldomesticcircumstances',
                        'referralissue', 'client', 'referraldietaryrequirements',
@@ -66,6 +81,10 @@ class ConsolidateTablesTransformer(BaseTransformer):
     }
 
     def __init__(self, count_encode):
+        """
+
+        :param count_encode: Whether to use count encoding for categorical variables
+        """
         self.count_encode = count_encode
 
     def transform(self, tables):
@@ -172,7 +191,20 @@ class ConsolidateTablesTransformer(BaseTransformer):
         return master_table.set_index('referral_referralinstanceid')
 
 class AddFutureReferralTargetFeatures(BaseTransformer):
+    """
+    Appends the future dependency score (dependent variable) to the input dataframe
+    Dependency at time t is defined as:
+
+    (number of referrals - number of gaps) / (52) in the time t to t + window in the future, which is bounded by 1 which
+    implies constant use in the year following the datapoint.
+    """
     def __init__(self, window=365, break_length=28, break_coefficients=1):
+        """
+
+        :param window: Lookahead period in days
+        :param break_length: Definition of a gap
+        :param break_coefficients: Bonus to the client for successful gap
+        """
         self.window = window
         self.break_length = break_length
         self.break_coefficients = break_coefficients
@@ -282,28 +314,16 @@ class AlignFeaturesToColumnSchemaTransformer(object):
         y = referral_table['futurereferraltargetfeature_futurereferralscore']
         return X.fillna(0), y.fillna(0), referral_table.drop(X.columns, axis=1, errors='ignore')
 
-class FullTransformer(BaseTransformer):
-    def __init__(self, features_to_split, column_schema):
-        self.column_schema = column_schema
-        self.features_to_split = features_to_split
-    
-    def fit_transform(self, tables_dict):
-        return self.transform(tables_dict)
-
-
-    def transform(self, tables_dict):
-        consolidate = ConsolidateTablesTransformer()
-        add_time_features = AddFuturereferralTargetFeatures()
-        split_current_and_ever = SplitCurrentAndEverTransformer(self.features_to_split)
-        align = AlignFeaturesToColumnSchemaTransformer(self.column_schema)
-        referral_table = consolidate.fit_transform(tables_dict)
-        referral_table = add_time_features.fit_transform(referral_table)
-        referral_table = split_current_and_ever.fit_transform(referral_table)
-        X, y, referral_table = align.fit_transform(referral_table)
-        return X, y, referral_table
 
 class TimeWindowFeatures(BaseTransformer):
+    """
+    Appends the referral count for the past n week windows
+    """
     def __init__(self, windows):
+        """
+
+        :param windows: List<int> where each integer represents a week length window to append
+        """
         self.windows = windows
 
     def get_rolling_count(self, referrals, window_size=10):
@@ -374,6 +394,9 @@ class ParseJSONToTablesTransformer(BaseTransformer):
         return tables_dict
 
 class TrainingDataGenerator(object):
+    """
+    A legacy object for creating a training matrix direct from an sqlite database dump of the TWC database
+    """
     SQL_DICT = {'referral': """SELECT * FROM referral;""",
                 
                 'client': """SELECT * FROM Client;""",
