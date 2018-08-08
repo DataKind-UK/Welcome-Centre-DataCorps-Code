@@ -80,21 +80,24 @@ def run_retrain(source, target):
     sudo docker pull 213288821174.dkr.ecr.eu-west-1.amazonaws.com/twc:latest
     sudo nohup sh -c 'sudo docker run 213288821174.dkr.ecr.eu-west-1.amazonaws.com/twc:latest python retrain.py --name {} {} && sudo shutdown -H now' > output 2>&1 &
     """
+    try:
+        EC2 = boto3.client('ec2', region_name='eu-west-1')
+        instance = EC2.run_instances(
+            InstanceType='t2.micro',
+            ImageId='ami-ca0135b3',
+            MinCount=1,  # required by boto, even though it's kinda obvious.
+            MaxCount=1,
+            InstanceInitiatedShutdownBehavior='terminate',  # make shutdown in script terminate ec2
+            IamInstanceProfile={'Name': 'twc_retrain'},
+            KeyName='twc_retrain',
+            UserData=init_script.format(target, source)  # file to run on instance init.
+        )
 
-    EC2 = boto3.client('ec2', region_name='eu-west-1')
-    instance = EC2.run_instances(
-        InstanceType='t2.micro',
-        ImageId='ami-ca0135b3',
-        MinCount=1,  # required by boto, even though it's kinda obvious.
-        MaxCount=1,
-        InstanceInitiatedShutdownBehavior='terminate',  # make shutdown in script terminate ec2
-        IamInstanceProfile={'Name': 'twc_retrain'},
-        UserData=init_script.format(target, source)  # file to run on instance init.
-    )
+        instance_id = instance['Instances'][0]['InstanceId']
 
-    instance_id = instance['Instances'][0]['InstanceId']
-
-    return instance_id
+        return {'Created instance_id': instance_id}
+    except:
+        return {'Failed to run remote script'}
 
 @api.route('/retrain')
 class Retrain(Resource):
