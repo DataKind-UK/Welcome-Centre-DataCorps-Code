@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 import json
 import sqlite3
+import logging
+
+logger = logging.getLogger('twc_logger')
 
 class BaseTransformer(object):
     """Scikit-learn style transformer pattern, operating on a feature object X and returning a transformed version
@@ -161,7 +164,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
                     flat_table = (tables[key].assign(**{item_id: self.encoding}).groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
                                                 .size().unstack().add_prefix(key + '_'))
                 else:
-                    flat_table = (tables[key].groupby(self.FLATTEN_TABLES_COLUMN_MAPPING[key])
+                    flat_table = (tables[key].groupby(list(self.FLATTEN_TABLES_COLUMN_MAPPING[key]))
                                                 .size().unstack().add_prefix(key + '_'))
                 referral_table = referral_table.merge(flat_table, left_on='referral_referralinstanceid',
                                                       right_index=True, how='left')
@@ -366,6 +369,8 @@ class TransformerPipeline(BaseTransformer):
 
     def fit_transform(self, X):
         for transformer in self.pipeline:
+            print('{} fit_transform'.format(type(transformer).__name__))
+            logger.debug('{} fit_transform'.format(type(transformer).__name__))
             X = transformer.fit_transform(X)
 
         return self.aligner.fit_transform(X)

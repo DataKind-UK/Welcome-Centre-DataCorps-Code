@@ -1,12 +1,15 @@
 from flask import Flask
 from flask import request
-from flask_restplus import Api, Resource
-from api.utils.aws import (get_models, set_model, get_status,
-                           get_current_model_key, load_model_into_memory)
+from flask_restplus import Api, Resource, abort
+
+from api.model.train import train_model_from_json
+from api.utils.aws import (get_models, set_model, get_status, load_train_file_into_memory,
+                           get_current_model_key, load_model_into_memory, next_model_name, save_model)
 from api.model.models import TWCModel
 from api.model.transformers import ParseJSONToTablesTransformer
 import json
 import logging
+import pickle
 
 app = Flask(__name__)
 app.config.from_object('api.config.ProdConfig')
@@ -67,7 +70,7 @@ class Score(Resource):
         update_model()
         return ModelContainer.current_model.predict(tables)[0]
 
-def run_retrain(source, target):
+def run_remote_retrain(source, target):
     import boto3
     init_script = """#!/bin/bash
     echo "sudo halt" | at now + 30 minutes
@@ -99,10 +102,40 @@ def run_retrain(source, target):
     except:
         return {'Failed to run remote script'}
 
+def run_retrain(source_filename, target=None, hyperparams=None):
+    logger = logging.getLogger('twc-logger')
+    logger.handlers = []
+    logger.setLevel(logging.DEBUG)
+    fh = logging.FileHandler('retrain_output.log')
+    sh = logging.StreamHandler()
+    standard_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(standard_formatter)
+    sh.setFormatter(standard_formatter)
+    logger.addHandler(fh)
+    logger.addFilter(sh)
+
+    try:
+        source = load_train_file_into_memory(source_filename)
+    except Exception as ex:
+        if ex.response['Error']['Code'] == '404':
+            abort(message='Retrain file not found in twc-input s3 bucket')
+
+    _, _, _, model = train_model_from_json(source, hyperparams={'n_estimators': 100})
+    if target is None:
+        target = next_model_name()
+    pickle.dump(model, open(target, 'wb'))
+    log_file = open('retrain_output.log', 'r').read()
+    save_model(target, 'retrain_output.log', '{}_retrain.log')
+
+    return log_file
+
+
 @api.route('/retrain')
 class Retrain(Resource):
     def post(self):
         json_data = request.get_json(force=True)
         if type(json_data) == str:
             json_data = json.loads(json_data)
-        return run_retrain(json_data['input_file'], json_data['model_name'])
+        if 'input_file' not in json_data:
+            abort(message='Input json requires an input_file key which should match a json file in the twc-input bucket')
+        return run_retrain(json_data['input_file'], json_data.get('model_name'))

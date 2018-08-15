@@ -1,26 +1,14 @@
 from sklearn.ensemble import RandomForestRegressor
-from api.utils.transformers import *
+from api.model.transformers import *
 import pickle
 
 class TWCModel(object):
-    def __init__(self):
-        self.transformer = None
-        self.model = None
+    def __init__(self, transformer, model):
+        self.transformer = transformer
+        self.model = model
 
     def get_model(self):
         return RandomForestRegressor(n_jobs=-1, n_estimators=1000)
-
-    def fit(self, tables):
-        self.transformer = TransformerPipeline([
-            ConsolidateTablesTransformer(),
-            AddTimeFeaturesTransformer(),
-            SplitCurrentAndEverTransformer(['ReferralIssue_', 'ReferralDomesticCircumstances_',
-                                            'ReferralReason_', 'ReferralBenefit_'])
-        ], aligner=AlignFeaturesToColumnSchemaTransformer())
-
-        self.model = self.get_model()
-        X, y, _ = self.transformer.fit_transform(tables)
-        self.model.fit(X, y)
 
     def predict(self, tables):
         X, _, _ = self.transformer.transform(tables)

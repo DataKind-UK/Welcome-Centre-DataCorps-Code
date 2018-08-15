@@ -122,7 +122,23 @@ def load_model_into_memory(model_key):
     model_dict = pickle.load(b)
     return model_dict
 
+def save_model(filename, logfile, logfile_name):
+    upload_file_to_bucket(filename, bucket_name(), filename)
+    upload_file_to_bucket(logfile, 'twc-input', logfile_name)
 
+def load_train_file_into_memory(filename):
+    b = BytesIO()
+    bucket = s3.Bucket('twc-input')
+    bucket.download_fileobj(filename, b)
+    b.seek(0)
+    input_file = json.load(b)
+    return input_file
+
+
+def next_model_name():
+    models = get_models()
+    top_model_id = max(models.keys())
+    return MODEL_ROOT_NAME + str(top_model_id + 1)
 
 
 
