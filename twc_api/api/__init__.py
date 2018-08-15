@@ -1,3 +1,6 @@
+import os
+import shutil
+
 from flask import Flask
 from flask import request
 from flask_restplus import Api, Resource, abort
@@ -102,32 +105,54 @@ def run_remote_retrain(source, target):
     except:
         return {'Failed to run remote script'}
 
-def run_retrain(source_filename, target=None, hyperparams=None):
-    logger = logging.getLogger('twc-logger')
+def get_logger():
+    if os.path.exists('retrain_output.log'):
+        os.remove('retrain_output.log')
+
+    logger = logging.getLogger('twc_logger')
     logger.handlers = []
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler('retrain_output.log')
+    fh.setLevel(logging.DEBUG)
     sh = logging.StreamHandler()
+    sh.setLevel(logging.DEBUG)
     standard_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(standard_formatter)
     sh.setFormatter(standard_formatter)
     logger.addHandler(fh)
-    logger.addFilter(sh)
+    logger.addHandler(sh)
+    return logger
+
+def run_retrain(source_filename, target=None, hyperparams=None):
+    if target is None:
+        target = next_model_name()
+
+    logger = get_logger()
+    logger.info('Starting retrain from source json dump {} to model file {}'.format(source_filename, target))
 
     try:
         source = load_train_file_into_memory(source_filename)
     except Exception as ex:
         if ex.response['Error']['Code'] == '404':
+            logger.error(ex)
             abort(message='Retrain file not found in twc-input s3 bucket')
 
-    _, _, _, model = train_model_from_json(source, hyperparams={'n_estimators': 100})
-    if target is None:
-        target = next_model_name()
-    pickle.dump(model, open(target, 'wb'))
-    log_file = open('retrain_output.log', 'r').read()
-    save_model(target, 'retrain_output.log', '{}_retrain.log')
+    try:
+        _, _, _, model = train_model_from_json(source, hyperparams)
+        pickle.dump(model, open(target, 'wb'))
 
-    return log_file
+        log_filename = '{}_retrain.log'.format(source_filename)
+
+        logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
+        log_file = open('retrain_output.log', 'r').read()
+        save_model(target, 'retrain_output.log', log_filename)
+
+        return log_file
+
+    except Exception as ex:
+        logger.error(ex)
+        log_file = open('retrain_output.log', 'r').read()
+        abort(message=log_file)
 
 
 @api.route('/retrain')

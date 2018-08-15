@@ -8,7 +8,7 @@ class TWCModel(object):
         self.model = model
 
     def get_model(self):
-        return RandomForestRegressor(n_jobs=-1, n_estimators=1000)
+        return RandomForestRegressor(n_jobs=-1, n_estimators=150)
 
     def predict(self, tables):
         X, _, _ = self.transformer.transform(tables)
