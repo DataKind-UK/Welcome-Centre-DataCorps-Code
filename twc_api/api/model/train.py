@@ -19,16 +19,13 @@ logger = logging.getLogger('twc_logger')
 
 def train_model_from_json(json_data, hyperparams=None, limit=None):
     logger.info('Beginning table parse')
-    print('hello')
     tables = construct_full_tables(json_data, limit)
     # Generate feature matrix and target vector
-    print('Generating xy')
     X, y, referral_table, transformer = generate_X_y(tables)
     # Split train and test sets
     X_train, X_test, y_train, y_test, referral_table_train, referral_table_test = \
         split_train_test(X, y, referral_table)
     # Evaluate  model
-    print('Training model')
     new_model = train_model(X_train, y_train, hyperparams)
 
     evaluate_model(new_model, X_test, y_test, referral_table_test, 0.2)
@@ -52,7 +49,6 @@ def construct_full_tables(json_data, limit=None):
     if limit is not None:
         json_data = json_data[:limit]
     for table_name in table_names:
-        print(table_name)
         records = [j.get(table_name) for j in json_data if table_name in j]
         tables[table_name] = pd.DataFrame(list(chain.from_iterable(records)))
     return tables

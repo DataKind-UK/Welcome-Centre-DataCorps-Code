@@ -369,7 +369,6 @@ class TransformerPipeline(BaseTransformer):
 
     def fit_transform(self, X):
         for transformer in self.pipeline:
-            print('{} fit_transform'.format(type(transformer).__name__))
             logger.debug('{} fit_transform'.format(type(transformer).__name__))
             X = transformer.fit_transform(X)
 

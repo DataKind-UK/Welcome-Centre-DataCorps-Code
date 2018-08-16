@@ -26,11 +26,11 @@ class ModelContainer(object):
 
 def update_model():
     current_model_key = get_current_model_key()
-    if ModelContainer.current_model != current_model_key:
+    if ModelContainer.current_version != current_model_key:
         app.logger.info('Model state changed, loading model')
-        model_dict = load_model_into_memory(current_model_key)
-        model = TWCModel()
-        model.load_from_object(model_dict['model'])
+        model = load_model_into_memory(current_model_key)
+        # model = TWCModel()
+        # model.load_from_object(model_dict['model'])
         ModelContainer.current_model, ModelContainer.current_version = model, current_model_key
 
 @api.route('/set-model')
@@ -71,7 +71,7 @@ class Score(Resource):
             json_data = json.loads(json_data)
         tables = self.parser.transform(json_data)
         update_model()
-        return ModelContainer.current_model.predict(tables)[0]
+        return ModelContainer.current_model.predict(tables)[-1]
 
 def run_remote_retrain(source, target):
     import boto3
