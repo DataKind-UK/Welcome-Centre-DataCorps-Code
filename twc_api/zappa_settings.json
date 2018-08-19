@@ -26,6 +26,7 @@
                 "iam:ListInstanceProfiles"
             ],
             "Resource": "*"
-        }]
+        }],
+        "timeout_seconds": 300
     }
 }
