@@ -8,7 +8,7 @@ import api
 import os
 import pandas as pd
 
-test_json = json.load(open('../../../requests/JSONExport20180803200350.JSON', 'r'))
+test_json = json.load(open('../../../requests/JSONExport20180819140915.JSON', 'r'))
 
 def get_test_payloads():
     test_users = pickle.load(open('test_clients.p', 'rb'))
