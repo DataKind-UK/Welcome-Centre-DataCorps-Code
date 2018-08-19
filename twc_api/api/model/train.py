@@ -101,7 +101,7 @@ def train_model(X_train, y_train, hyperparams=None):
     if hyperparams is not None:
         et = ExtraTreesRegressor(n_jobs=-1, **hyperparams)
     else:
-        et = ExtraTreesRegressor(n_jobs=-1, n_estimators=500)
+        et = ExtraTreesRegressor(n_jobs=-1, n_estimators=120)
 
     et.fit(X_train, y_train)
     logger.info('Trained Model on: {} observations'.format(len(X_train)))
