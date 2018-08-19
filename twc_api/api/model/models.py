@@ -1,6 +1,7 @@
 from sklearn.ensemble import RandomForestRegressor
 from api.model.transformers import *
 import pickle
+import numpy as np
 
 class TWCModel(object):
     def __init__(self, transformer, model):
@@ -12,7 +13,9 @@ class TWCModel(object):
 
     def predict(self, tables):
         X, _, _ = self.transformer.transform(tables)
-        return self.model.predict(X)
+        pred = self.model.predict(X)
+        pred_series = pd.Series(pred, X.index)
+        return pred_series.to_dict()
 
     def save(self, file_name):
         with open(file_name, 'wb') as file:

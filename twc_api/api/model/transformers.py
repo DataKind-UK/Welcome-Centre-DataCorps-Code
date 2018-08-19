@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import sqlite3
 import logging
+import numpy as np
 
 logger = logging.getLogger('twc_logger')
 
@@ -127,7 +128,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
                                         columns=dummied_cols,
                                         prefix_sep='_')
         else:
-            categories = pd.get_dummies(client_table[dummied_cols],
+            categories = pd.get_dummies(client_table[dummied_cols].astype(float),
                                        columns=dummied_cols,
                                        prefix_sep='_')
         variables = ['age', 'addresslength', 'clientismale', 'knownpartner', 'clientid']
@@ -190,7 +191,7 @@ class ConsolidateTablesTransformer(BaseTransformer):
                                             right_on='client_clientid', how='left')
 
         # Order by referral taken date - this is important for spliting the train/test sets
-        master_table = master_table.sort_values('referral_referraltakendate')
+        master_table = master_table.sort_values(['referral_referraltakendate', 'referral_referralinstanceid'])
         return master_table.set_index('referral_referralinstanceid')
 
 class AddFutureReferralTargetFeatures(BaseTransformer):
@@ -213,9 +214,12 @@ class AddFutureReferralTargetFeatures(BaseTransformer):
         self.break_coefficients = break_coefficients
 
 
-    def transform(self, referral_table):
+    def fit_transform(self, referral_table):
         referral_table = self.calc_look_ahead_stats(referral_table, self.window,
                                                     self.break_length, self.break_coefficients)
+        return referral_table
+
+    def transform(self, referral_table):
         return referral_table
         
     def calc_look_ahead_stats(self, referrals, window=365, break_length=28, break_coefficient=1):
@@ -309,13 +313,15 @@ class AlignFeaturesToColumnSchemaTransformer(object):
         
     def fit_transform(self, referral_table):
         self.column_schema = list(referral_table.drop(self.to_drop, axis=1, errors='ignore').columns)
-        return self.transform(referral_table)
-
-    def transform(self, referral_table):
         referral_table = referral_table.sort_values('referral_referraltakendate')
         X = referral_table.reindex(self.column_schema, axis=1)
         y = referral_table['futurereferraltargetfeature_futurereferralscore']
         return X.fillna(0), y.fillna(0), referral_table.drop(X.columns, axis=1, errors='ignore')
+
+    def transform(self, referral_table):
+        referral_table = referral_table.sort_values('referral_referraltakendate')
+        X = referral_table.reindex(self.column_schema, axis=1)
+        return X.fillna(0), None, referral_table.drop(X.columns, axis=1, errors='ignore')
 
 
 class TimeWindowFeatures(BaseTransformer):
@@ -392,7 +398,7 @@ class ParseJSONToTablesTransformer(BaseTransformer):
         tables_dict = {}
         for k, v in json_data.items():
             if v:
-                tables_dict[k] = pd.DataFrame(v)
+                tables_dict[k] = pd.DataFrame(v).replace({None: np.nan})
             else:
                 tables_dict[k] = pd.DataFrame()
         return tables_dict

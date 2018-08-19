@@ -1,4 +1,5 @@
 import json
+import pickle
 from collections import defaultdict
 from itertools import chain
 
@@ -17,31 +18,27 @@ table_names = ['referral', 'referralreason', 'client', 'referralbenefit', 'refer
 
 logger = logging.getLogger('twc_logger')
 
-def train_model_from_json(json_data, hyperparams=None, limit=None):
+def train_model_from_json(json_data, hyperparams=None, limit=None, test=False):
     logger.info('Beginning table parse')
     tables = construct_full_tables(json_data, limit)
     # Generate feature matrix and target vector
     X, y, referral_table, transformer = generate_X_y(tables)
     # Split train and test sets
-    X_train, X_test, y_train, y_test, referral_table_train, referral_table_test = \
-        split_train_test(X, y, referral_table)
-    # Evaluate  model
-    new_model = train_model(X_train, y_train, hyperparams)
+    if test:
+        X_train, X_test, y_train, y_test, referral_table_train, referral_table_test = \
+            split_train_test(X, y, referral_table)
+        # Evaluate  model
+        new_model = train_model(X_train, y_train, hyperparams)
 
-    evaluate_model(new_model, X_test, y_test, referral_table_test, 0.2)
+        evaluate_model(new_model, X_test, y_test, referral_table_test, 0.2)
 
-    twc_model = TWCModel(transformer, new_model)
+        twc_model = TWCModel(transformer, new_model)
 
-    return X, y, referral_table, twc_model
-
-    # Return Threshold
-    """PLACE HOLDER FOR CREATING A THRESHOLD/REFERRALS PER WEEK CURVE"""
-
-    # Train production model on all data
-    new_model, final_training_status = train_model(X, y)
-    summary_statuses.append(final_training_status)
-    print('\n'.join(summary_statuses))
-    return X, y, referral_table, new_model, '\n'.join(summary_statuses)
+        return X, y, referral_table, twc_model
+    else:
+        new_model = train_model(X, y, hyperparams)
+        twc_model = TWCModel(transformer, new_model)
+        return X, y, referral_table, twc_model
 
 
 def construct_full_tables(json_data, limit=None):
@@ -110,6 +107,8 @@ def train_model(X_train, y_train, hyperparams=None):
 
 def evaluate_model(model, X_test, y_test, referral_table_test, threshold):
     y_pred = model.predict(X_test)
+    pickle.dump(pd.Series(y_pred, X_test.index), open('test_predictions.p', 'wb'))
+    pickle.dump(X_test, open('test_features.p', 'wb'))
     evaluation_series = evaluate_average_weekly_rank_correlation(referral_table_test,
                                                                  y_test, y_pred, threshold)
     logger.info("Model Test Evaluation Metrics:\n" \
