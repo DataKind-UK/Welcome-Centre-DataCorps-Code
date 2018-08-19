@@ -13,11 +13,11 @@ def get_scores_per_window(actual, predicted, group, threshold=0.50):
 def evaluate_average_weekly_rank_correlation(test_referral_table, y_test, y_pred, threshold):
     grouped_y = test_referral_table.assign(y=y_test, pred=y_pred)\
                                     .set_index('referral_referraltakendate')\
-                                    .groupby([pd.TimeGrouper('1W'), 'client_clientid'])['y']\
+                                    .groupby([pd.Grouper(freq='1W'), 'client_clientid'])['y']\
                                     .mean()
     grouped_pred_y = test_referral_table.assign(y=y_test, pred=y_pred)\
                                         .set_index('referral_referraltakendate')\
-                                        .groupby([pd.TimeGrouper('1W'), 'client_clientid'])['pred']\
+                                        .groupby([pd.Grouper(freq='1W'), 'client_clientid'])['pred']\
                                         .mean()
     time_grouped = pd.concat([grouped_y, grouped_pred_y], axis=1)
     return time_grouped.reset_index()\
