@@ -40,7 +40,7 @@ class SetModel(Resource):
     def get(self):
         version = request.args.get('version')
         set_model(version)
-        ModelContainer.current_model = update_model()
+        update_model()
         return get_status()
 
 @api.route('/models')

@@ -53,7 +53,7 @@ class TestRetrain(TestCase):
         predictions = pickle.load(open('test_predictions.p', 'rb'))
         f1.return_value = pickle.load(open('twc_model_5', 'rb'))
 
-        for i, t in enumerate(test_payloads[248:]):
+        for i, t in enumerate(test_payloads):
             response = self.app.post('score', json=t)
             return_series = pd.Series(response.json)
             return_series.index = return_series.index.astype(int)
