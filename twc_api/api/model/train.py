@@ -107,6 +107,8 @@ def train_model(X_train, y_train, hyperparams=None):
 
 def evaluate_model(model, X_test, y_test, referral_table_test, threshold):
     y_pred = model.predict(X_test)
+
+    # following dumps may be useful for testing
     # pickle.dump(pd.Series(y_pred, X_test.index), open('test_predictions.p', 'wb'))
     # pickle.dump(X_test, open('test_features.p', 'wb'))
     # pickle.dump(referral_table_test, open('ref_table.p', 'wb'))
