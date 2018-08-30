@@ -13,6 +13,8 @@ from api.model.transformers import ParseJSONToTablesTransformer
 import json
 import logging
 import pickle
+from zappa.async import task, get_async_response
+
 
 app = Flask(__name__)
 app.config.from_object('api.config.ProdConfig')
@@ -123,37 +125,38 @@ def get_logger():
     logger.addHandler(sh)
     return logger
 
+@task
 def run_retrain(source_filename, target=None, hyperparams=None, test=False):
-    if target is None:
-        target = next_model_name()
+    with app.app_context():  # This is used since the run_retrain requires app context 
+        if target is None:
+            target = next_model_name()
 
-    logger = get_logger()
-    logger.info('Starting retrain from source json dump {} to model file {}'.format(source_filename, target))
+        logger = get_logger()
+        logger.info('Starting retrain from source json dump {} to model file {}'.format(source_filename, target))
 
-    try:
-        source = load_train_file_into_memory(source_filename)
-    except Exception as ex:
-        if ex.response['Error']['Code'] == '404':
+        try:
+            source = load_train_file_into_memory(source_filename)
+        except Exception as ex:
+            if ex.response['Error']['Code'] == '404':
+                logger.error(ex)
+                abort(message='Retrain file not found in twc-input s3 bucket')
+
+        try:
+            _, _, _, model = train_model_from_json(source, hyperparams=hyperparams, test=test)
+            pickle.dump(model, open(target, 'wb'))
+
+            log_filename = '{}_retrain.log'.format(source_filename)
+
+            logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
+            log_file = open('retrain_output.log', 'r').read()
+            save_model(target, 'retrain_output.log', log_filename)
+
+            return log_file
+
+        except Exception as ex:
             logger.error(ex)
-            abort(message='Retrain file not found in twc-input s3 bucket')
-
-    try:
-        _, _, _, model = train_model_from_json(source, hyperparams=hyperparams, test=test)
-        pickle.dump(model, open(target, 'wb'))
-
-        log_filename = '{}_retrain.log'.format(source_filename)
-
-        logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
-        log_file = open('retrain_output.log', 'r').read()
-        save_model(target, 'retrain_output.log', log_filename)
-
-        return log_file
-
-    except Exception as ex:
-        logger.error(ex)
-        log_file = open('retrain_output.log', 'r').read()
-        abort(message=log_file)
-
+            log_file = open('retrain_output.log', 'r').read()
+            abort(message=log_file)
 
 @api.route('/retrain')
 class Retrain(Resource):
@@ -166,4 +169,5 @@ class Retrain(Resource):
         test = False
         if 'test' in json_data:
             test = json_data.get('test')
-        return run_retrain(json_data['input_file'], json_data.get('model_name'), test=test)
+        run_retrain(json_data['input_file'], json_data.get('model_name'), test=test)
+        return 'Running model in async mode'
