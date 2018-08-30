@@ -40,7 +40,7 @@ class SetModel(Resource):
     def get(self):
         version = request.args.get('version')
         set_model(version)
-        ModelContainer.current_model = update_model()
+        update_model()
         return get_status()
 
 @api.route('/models')
@@ -71,7 +71,7 @@ class Score(Resource):
             json_data = json.loads(json_data)
         tables = self.parser.transform(json_data)
         update_model()
-        return ModelContainer.current_model.predict(tables)[-1]
+        return ModelContainer.current_model.predict(tables)
 
 def run_remote_retrain(source, target):
     import boto3
@@ -123,7 +123,7 @@ def get_logger():
     logger.addHandler(sh)
     return logger
 
-def run_retrain(source_filename, target=None, hyperparams=None):
+def run_retrain(source_filename, target=None, hyperparams=None, test=False):
     if target is None:
         target = next_model_name()
 
@@ -138,7 +138,7 @@ def run_retrain(source_filename, target=None, hyperparams=None):
             abort(message='Retrain file not found in twc-input s3 bucket')
 
     try:
-        _, _, _, model = train_model_from_json(source, hyperparams)
+        _, _, _, model = train_model_from_json(source, hyperparams=hyperparams, test=test)
         pickle.dump(model, open(target, 'wb'))
 
         log_filename = '{}_retrain.log'.format(source_filename)
@@ -163,4 +163,7 @@ class Retrain(Resource):
             json_data = json.loads(json_data)
         if 'input_file' not in json_data:
             abort(message='Input json requires an input_file key which should match a json file in the twc-input bucket')
-        return run_retrain(json_data['input_file'], json_data.get('model_name'))
+        test = False
+        if 'test' in json_data:
+            test = json_data.get('test')
+        return run_retrain(json_data['input_file'], json_data.get('model_name'), test=test)
