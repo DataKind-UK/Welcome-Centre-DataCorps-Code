@@ -8,7 +8,7 @@ from flask_restplus import Api, Resource, abort
 from api.model.train import train_model_from_json
 from api.utils.aws import (get_models, set_model, get_status, load_train_file_into_memory,
                            get_current_model_key, load_model_into_memory, next_model_name, save_model,
-                           sync_log_to_s3, clear_log_file_from_s3, get_training_log_json)
+                           sync_log_to_s3, clear_log_file_from_s3, get_training_log_json, download_log_from_s3)
 from api.model.models import TWCModel
 from api.model.transformers import ParseJSONToTablesTransformer
 import json
@@ -79,9 +79,12 @@ class Score(Resource):
             'scores': ModelContainer.current_model.predict(tables)
         }
 
-def get_logger():
-    if os.path.exists('retrain_output.log'):
-        os.remove('retrain_output.log')
+def get_logger(append_previous=False):
+    if append_previous:
+        download_log_from_s3()
+    else:
+        if os.path.exists('retrain_output.log'):
+            os.remove('retrain_output.log')
 
     logger = logging.getLogger('twc_logger')
     logger.handlers = []
@@ -98,14 +101,18 @@ def get_logger():
     return logger
 
 @task
-def run_retrain(source_filename, target=None, hyperparams=None, test=False):
+def run_retrain(source_filename, hyperparams=None, test=False):
     with app.app_context():  # This is used since the run_retrain requires app context 
-        clear_log_file_from_s3()
-        if target is None:
-            target, version_number = next_model_name()
 
-        logger = get_logger()
-        logger.info('Starting retrain from source json dump {} to model file {}'.format(source_filename, target))
+        target, version_number = next_model_name()
+
+        logger = get_logger(not test)
+
+        if test:
+            logger.info('Starting test evaluation from source json dump {}'.format(source_filename, target))
+        else:
+            logger.info('Starting full retrain from source json dump {} to model file {}'.format(source_filename, target))
+
         sync_log_to_s3(logger)
         try:
             source = load_train_file_into_memory(source_filename)
@@ -116,17 +123,20 @@ def run_retrain(source_filename, target=None, hyperparams=None, test=False):
                 abort(message='Retrain file not found in twc-input s3 bucket')
         try:
             _, _, _, model = train_model_from_json(source, hyperparams=hyperparams, test=test)
-            pickle.dump(model, open(target, 'wb'))
+            if test:
+                run_retrain(source_filename, target, hyperparams, False)
+            else:
+                pickle.dump(model, open(target, 'wb'))
 
-            log_filename = '{}_retrain_{}.log'.format(source_filename, target)
+                log_filename = '{}_retrain_{}.log'.format(source_filename, target)
 
-            logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
-            sync_log_to_s3(logger)
-            log_file = open('retrain_output.log', 'r').read()
-            save_model(target, 'retrain_output.log', log_filename)
-            set_model(version_number)
-            clear_log_file_from_s3()
-            return log_file
+                logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
+                sync_log_to_s3(logger)
+                log_file = open('retrain_output.log', 'r').read()
+                save_model(target, 'retrain_output.log', log_filename)
+                set_model(version_number)
+                clear_log_file_from_s3()
+                return log_file
 
         except Exception as ex:
             logger.error(ex)

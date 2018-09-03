@@ -58,7 +58,7 @@ def generate_X_y(tables):
         ConsolidateTablesTransformer(count_encode=False),
         AddFutureReferralTargetFeatures(),
         TimeFeatureTransformer(break_length=28),
-        TimeWindowFeatures([1,2,4,8,16,32]),
+        TimeWindowFeatures([1, 4, 12]),
         SplitCurrentAndEverTransformer(['referralissue_',
                                         'referraldomesticcircumstances_',
                                         'referralreason_', 'referralbenefit_'])

@@ -137,6 +137,9 @@ def sync_log_to_s3(logger):
 def clear_log_file_from_s3():
     s3.Object(TRAINING_BUCKET, ACTIVE_RUN_LOGFILE_NAME).delete()
 
+def download_log_from_s3():
+    s3.Bucket(TRAINING_BUCKET).download_file(ACTIVE_RUN_LOGFILE_NAME, 'retrain_output.log')
+
 def get_training_log_json():
     try:
         return_value = s3.Object(TRAINING_BUCKET, ACTIVE_RUN_LOGFILE_NAME).get()['Body'].read().decode('utf-8')
