@@ -59,7 +59,7 @@ class Status(Resource):
         return status
 
 @api.route('/current-model')
-class Status(Resource):
+class CurrentModel(Resource):
     def get(self):
         return get_current_model_key()
 
@@ -74,7 +74,10 @@ class Score(Resource):
             json_data = json.loads(json_data)
         tables = self.parser.transform(json_data)
         update_model()
-        return ModelContainer.current_model.predict(tables)
+        return {
+            'model_name': get_current_model_key(),
+            'scores': ModelContainer.current_model.predict(tables)
+        }
 
 def get_logger():
     if os.path.exists('retrain_output.log'):
