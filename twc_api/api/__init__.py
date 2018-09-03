@@ -1,7 +1,8 @@
 import os
 import shutil
+from time import sleep
 
-from flask import Flask
+from flask import Flask, redirect
 from flask import request
 from flask_restplus import Api, Resource, abort
 
@@ -143,19 +144,12 @@ def run_retrain(source_filename, hyperparams=None, test=False):
             log_file = open('retrain_output.log', 'r').read()
             abort(message=log_file)
 
-@api.route('/retrain')
+@api.route('/retrain/<string:input_file>')
 class Retrain(Resource):
-    def post(self):
-        json_data = request.get_json(force=True)
-        if type(json_data) == str:
-            json_data = json.loads(json_data)
-        if 'input_file' not in json_data:
-            abort(message='Input json requires an input_file key which should match a json file in the twc-input bucket')
-        test = False
-        if 'test' in json_data:
-            test = json_data.get('test')
-        run_retrain(json_data['input_file'], json_data.get('model_name'), test=test)
-        return 'Running model in async mode'
+    def get(self, input_file):
+        run_retrain(input_file, test=True)
+        sleep(2)
+        return redirect('/retrain-log')
 
 @api.route('/retrain-log')
 class RetrainLog(Resource):
