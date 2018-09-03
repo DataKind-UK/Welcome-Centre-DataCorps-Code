@@ -7,6 +7,7 @@ import tempfile
 import pickle
 import json
 from io import BytesIO
+import logging
 
 import shutil
 from botocore.exceptions import ClientError
@@ -14,6 +15,8 @@ from flask import current_app
 
 STATUS_FILE_NAME = 'twc_status'
 MODEL_ROOT_NAME = 'twc_model_'
+ACTIVE_RUN_LOGFILE_NAME = 'current_retrain_run.log'
+TRAINING_BUCKET = 'twc-input'
 
 if 'SERVERTYPE' in os.environ and os.environ['SERVERTYPE'] == 'AWS Lambda':
     sess = boto3.Session()
@@ -48,22 +51,6 @@ class ModelNotFound(Exception):
 
 class NoModelsFound(Exception):
     pass
-
-def save_model(model, version=None):
-    models = get_models()
-    if version is None:
-        max_version = max(max(models.keys()), 0)
-        next_version = max_version + 1
-    else:
-        if version in models:
-            raise OverwriteFailure
-        next_version = version
-
-    tf = tempfile.NamedTemporaryFile(delete=False)
-    with open(tf.name, 'wb') as fh:
-        pickle.dump({'model': model, 'version': next_version}, fh)
-    upload_file_to_bucket(tf.name, bucket_name(), MODEL_ROOT_NAME + str(next_version))
-    os.remove(tf.name)
 
 
 def get_status():
@@ -124,11 +111,11 @@ def load_model_into_memory(model_key):
 
 def save_model(filename, logfile, logfile_name):
     upload_file_to_bucket(filename, bucket_name(), filename)
-    upload_file_to_bucket(logfile, 'twc-input', logfile_name)
+    upload_file_to_bucket(logfile, TRAINING_BUCKET, logfile_name)
 
 def load_train_file_into_memory(filename):
     b = BytesIO()
-    bucket = s3.Bucket('twc-input')
+    bucket = s3.Bucket(TRAINING_BUCKET)
     bucket.download_fileobj(filename, b)
     b.seek(0)
     input_file = json.load(b)
@@ -138,7 +125,22 @@ def load_train_file_into_memory(filename):
 def next_model_name():
     models = get_models()
     top_model_id = max(models.keys())
-    return MODEL_ROOT_NAME + str(top_model_id + 1)
+    next_model_id = top_model_id + 1
+    return MODEL_ROOT_NAME + str(top_model_id + 1), next_model_id
 
+def sync_log_to_s3(logger):
+    file_handlers = [fh for fh in logger.handlers if type(fh)==logging.FileHandler]
+    if file_handlers:
+        fh = file_handlers[0]
+        upload_file_to_bucket(fh.baseFilename, TRAINING_BUCKET, ACTIVE_RUN_LOGFILE_NAME)
 
+def clear_log_file_from_s3():
+    s3.Object(TRAINING_BUCKET, ACTIVE_RUN_LOGFILE_NAME).delete()
 
+def get_training_log_json():
+    try:
+        return_value = s3.Object(TRAINING_BUCKET, ACTIVE_RUN_LOGFILE_NAME).get()['Body'].read().decode('utf-8')
+    except ClientError as ex:
+        return_value = 'No model currently running'
+    return return_value
+    
