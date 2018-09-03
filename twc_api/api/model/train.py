@@ -11,6 +11,7 @@ from api.model.transformers import (TransformerPipeline, ConsolidateTablesTransf
                                     SplitCurrentAndEverTransformer,
                                     AlignFeaturesToColumnSchemaTransformer)
 from sklearn.ensemble import ExtraTreesRegressor
+from api.utils.aws import sync_log_to_s3
 import logging
 
 table_names = ['referral', 'referralreason', 'client', 'referralbenefit', 'referralissue', 'referraldocument',
@@ -20,6 +21,7 @@ logger = logging.getLogger('twc_logger')
 
 def train_model_from_json(json_data, hyperparams=None, limit=None, test=False):
     logger.info('Beginning table parse')
+    sync_log_to_s3(logger)
     tables = construct_full_tables(json_data, limit)
     # Generate feature matrix and target vector
     X, y, referral_table, transformer = generate_X_y(tables)
@@ -76,6 +78,7 @@ def generate_X_y(tables):
     X = X.fillna(0)
     logger.info("Features Matrix generated" \
                 " consisting of {} referrals and {} features".format(X.shape[0], X.shape[1]))
+    sync_log_to_s3(logger)
     return X, y, referral_table, transformer
 
 
@@ -91,6 +94,7 @@ def split_train_test(X, y, referral_table, test_proportion=0.25):
     logger.info("Train/Test sets split.\n" \
                 "Train set: {} referrals.\n" \
                 "Test set: {} referrals".format(len(X_train), len(X_test)))
+    sync_log_to_s3(logger)
     return X_train, X_test, y_train, y_test, referral_table_train, referral_table_test
 
 
@@ -102,6 +106,7 @@ def train_model(X_train, y_train, hyperparams=None):
 
     et.fit(X_train, y_train)
     logger.info('Trained Model on: {} observations'.format(len(X_train)))
+    sync_log_to_s3(logger)
     return et
 
 
@@ -119,4 +124,6 @@ def evaluate_model(model, X_test, y_test, referral_table_test, threshold):
                 "\tTest Set Correlation of Predicted and Actual Mean Weekly Scores: {}\n" \
                 "\tTest Set Overlap of top {}% worst cases: {}" \
                 .format(evaluation_series['spearman'], threshold * 100, evaluation_series['overlap']))
+    sync_log_to_s3(logger)
+
 
