@@ -22,11 +22,6 @@ test_payloads = get_test_payloads()
 
 class TestRetrain(TestCase):
     def setUp(self):
-        # api.app.app.config['TESTING'] = True
-        # api.app.app.config['WTF_CSRF_ENABLED'] = False
-        # api.app.app.config['DEBUG'] = False
-        # api.app.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///..' + \
-        #                 os.path.join(TEST_DB)
         api.app.config.from_object('api.config.TestingConfig')
         self.app = api.app.test_client()
 
@@ -43,9 +38,7 @@ class TestRetrain(TestCase):
         self.app.post('retrain', json={'input_file': 'blah', 'test': True})
         predictions = pickle.load(open('test_predictions.p', 'rb'))
         f4.return_value = pickle.load(open('twc_model_5', 'rb'))
-        # for t in test_payloads:
-        #     response = self.app.post('score', json=t)
-        #     print('hi')
+
 
     @mock.patch('api.get_current_model_key', autospec=True)
     @mock.patch('api.load_model_into_memory', autospec=True)
@@ -59,5 +52,4 @@ class TestRetrain(TestCase):
             return_series.index = return_series.index.astype(int)
             df = pd.concat([predictions.loc[return_series.index], return_series], axis=1).dropna()
             all_matched = ((df[1] - df[0]).abs() < 1e-9).all()
-            print(all_matched)
-            # self.assertTrue(all_matched)
+            self.assertTrue(all_matched)

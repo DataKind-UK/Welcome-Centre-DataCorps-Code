@@ -76,38 +76,6 @@ class Score(Resource):
         update_model()
         return ModelContainer.current_model.predict(tables)
 
-def run_remote_retrain(source, target):
-    import boto3
-    init_script = """#!/bin/bash
-    echo "sudo halt" | at now + 30 minutes
-    sudo yum update -y
-    sudo yum install -y docker
-    sudo service docker start
-    sudo usermod -a -G docker ec2-user
-    aws configure set region eu-west-1
-    sudo $(aws ecr get-login --no-include-email)
-    sudo docker pull 213288821174.dkr.ecr.eu-west-1.amazonaws.com/twc:latest
-    sudo nohup sh -c 'sudo docker run 213288821174.dkr.ecr.eu-west-1.amazonaws.com/twc:latest python retrain.py --name {} {} && sudo shutdown -H now' > output 2>&1 &
-    """
-    try:
-        EC2 = boto3.client('ec2', region_name='eu-west-1')
-        instance = EC2.run_instances(
-            InstanceType='t2.micro',
-            ImageId='ami-ca0135b3',
-            MinCount=1,  # required by boto, even though it's kinda obvious.
-            MaxCount=1,
-            InstanceInitiatedShutdownBehavior='terminate',  # make shutdown in script terminate ec2
-            IamInstanceProfile={'Name': 'twc_retrain'},
-            KeyName='twc_retrain',
-            UserData=init_script.format(target, source)  # file to run on instance init.
-        )
-
-        instance_id = instance['Instances'][0]['InstanceId']
-
-        return {'Created instance_id': instance_id}
-    except:
-        return {'Failed to run remote script'}
-
 def get_logger():
     if os.path.exists('retrain_output.log'):
         os.remove('retrain_output.log')
