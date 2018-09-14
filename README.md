@@ -56,7 +56,12 @@ There was data available for teh past 3 years of TWC activity. This data covered
 ### Modeling Approach
 
 Every time a client is referred, the model will predict the dependency score based on the client’s history of referrals, client issues, referral issues and personal characteristics.
-[TO BE COMPLETED]
+[TO BE COMPLETED - David/James]
+
+### Interpreting the model results
+
+[TO BE COMPLETED - David/James/Andrew?]
 
 ## Guide to installation/setup
 
+Should this go here or a separate readme just alongside the code?
