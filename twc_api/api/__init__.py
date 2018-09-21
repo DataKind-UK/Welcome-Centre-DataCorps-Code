@@ -1,14 +1,15 @@
 import os
 import shutil
+from time import sleep
 
-from flask import Flask
+from flask import Flask, redirect, url_for
 from flask import request
 from flask_restplus import Api, Resource, abort
 
 from api.model.train import train_model_from_json
 from api.utils.aws import (get_models, set_model, get_status, load_train_file_into_memory,
                            get_current_model_key, load_model_into_memory, next_model_name, save_model,
-                           sync_log_to_s3, clear_log_file_from_s3, get_training_log_json)
+                           sync_log_to_s3, clear_log_file_from_s3, get_training_log_json, download_log_from_s3)
 from api.model.models import TWCModel
 from api.model.transformers import ParseJSONToTablesTransformer
 import json
@@ -59,7 +60,7 @@ class Status(Resource):
         return status
 
 @api.route('/current-model')
-class Status(Resource):
+class CurrentModel(Resource):
     def get(self):
         return get_current_model_key()
 
@@ -74,43 +75,17 @@ class Score(Resource):
             json_data = json.loads(json_data)
         tables = self.parser.transform(json_data)
         update_model()
-        return ModelContainer.current_model.predict(tables)
+        return {
+            'model_name': get_current_model_key(),
+            'scores': ModelContainer.current_model.predict(tables)
+        }
 
-def run_remote_retrain(source, target):
-    import boto3
-    init_script = """#!/bin/bash
-    echo "sudo halt" | at now + 30 minutes
-    sudo yum update -y
-    sudo yum install -y docker
-    sudo service docker start
-    sudo usermod -a -G docker ec2-user
-    aws configure set region eu-west-1
-    sudo $(aws ecr get-login --no-include-email)
-    sudo docker pull 213288821174.dkr.ecr.eu-west-1.amazonaws.com/twc:latest
-    sudo nohup sh -c 'sudo docker run 213288821174.dkr.ecr.eu-west-1.amazonaws.com/twc:latest python retrain.py --name {} {} && sudo shutdown -H now' > output 2>&1 &
-    """
-    try:
-        EC2 = boto3.client('ec2', region_name='eu-west-1')
-        instance = EC2.run_instances(
-            InstanceType='t2.micro',
-            ImageId='ami-ca0135b3',
-            MinCount=1,  # required by boto, even though it's kinda obvious.
-            MaxCount=1,
-            InstanceInitiatedShutdownBehavior='terminate',  # make shutdown in script terminate ec2
-            IamInstanceProfile={'Name': 'twc_retrain'},
-            KeyName='twc_retrain',
-            UserData=init_script.format(target, source)  # file to run on instance init.
-        )
-
-        instance_id = instance['Instances'][0]['InstanceId']
-
-        return {'Created instance_id': instance_id}
-    except:
-        return {'Failed to run remote script'}
-
-def get_logger():
-    if os.path.exists('retrain_output.log'):
-        os.remove('retrain_output.log')
+def get_logger(append_previous=False):
+    if append_previous:
+        download_log_from_s3()
+    else:
+        if os.path.exists('retrain_output.log'):
+            os.remove('retrain_output.log')
 
     logger = logging.getLogger('twc_logger')
     logger.handlers = []
@@ -127,14 +102,18 @@ def get_logger():
     return logger
 
 @task
-def run_retrain(source_filename, target=None, hyperparams=None, test=False):
+def run_retrain(source_filename, hyperparams=None, test=False):
     with app.app_context():  # This is used since the run_retrain requires app context 
-        clear_log_file_from_s3()
-        if target is None:
-            target, version_number = next_model_name()
 
-        logger = get_logger()
-        logger.info('Starting retrain from source json dump {} to model file {}'.format(source_filename, target))
+        target, version_number = next_model_name()
+
+        logger = get_logger(not test)
+
+        if test:
+            logger.info('Starting test evaluation from source json dump {}'.format(source_filename, target))
+        else:
+            logger.info('Starting full retrain from source json dump {} to model file {}'.format(source_filename, target))
+
         sync_log_to_s3(logger)
         try:
             source = load_train_file_into_memory(source_filename)
@@ -145,36 +124,32 @@ def run_retrain(source_filename, target=None, hyperparams=None, test=False):
                 abort(message='Retrain file not found in twc-input s3 bucket')
         try:
             _, _, _, model = train_model_from_json(source, hyperparams=hyperparams, test=test)
-            pickle.dump(model, open(target, 'wb'))
+            if test:
+                run_retrain(source_filename, hyperparams, False)
+            else:
+                pickle.dump(model, open(target, 'wb'))
 
-            log_filename = '{}_retrain_{}.log'.format(source_filename, target)
+                log_filename = '{}_retrain_{}.log'.format(source_filename, target)
 
-            logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
-            sync_log_to_s3(logger)
-            log_file = open('retrain_output.log', 'r').read()
-            save_model(target, 'retrain_output.log', log_filename)
-            set_model(version_number)
-            clear_log_file_from_s3()
-            return log_file
+                logger.info('Uploading model file [{}] and log receipt [{}] to s3'.format(target, log_filename))
+                sync_log_to_s3(logger)
+                log_file = open('retrain_output.log', 'r').read()
+                save_model(target, 'retrain_output.log', log_filename)
+                set_model(version_number)
+                clear_log_file_from_s3()
+                return log_file
 
         except Exception as ex:
             logger.error(ex)
             log_file = open('retrain_output.log', 'r').read()
             abort(message=log_file)
 
-@api.route('/retrain')
+@api.route('/retrain/<string:input_file>')
 class Retrain(Resource):
-    def post(self):
-        json_data = request.get_json(force=True)
-        if type(json_data) == str:
-            json_data = json.loads(json_data)
-        if 'input_file' not in json_data:
-            abort(message='Input json requires an input_file key which should match a json file in the twc-input bucket')
-        test = False
-        if 'test' in json_data:
-            test = json_data.get('test')
-        run_retrain(json_data['input_file'], json_data.get('model_name'), test=test)
-        return 'Running model in async mode'
+    def get(self, input_file):
+        run_retrain(input_file, test=True)
+        sleep(5)
+        return redirect(url_for('retrain_log'))
 
 @api.route('/retrain-log')
 class RetrainLog(Resource):

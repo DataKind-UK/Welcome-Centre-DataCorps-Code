@@ -9,7 +9,7 @@ import pandas as pd
 from api.model.transformers import (TransformerPipeline, ConsolidateTablesTransformer,
                                     AddFutureReferralTargetFeatures, TimeFeatureTransformer,
                                     SplitCurrentAndEverTransformer,
-                                    AlignFeaturesToColumnSchemaTransformer)
+                                    AlignFeaturesToColumnSchemaTransformer, TimeWindowFeatures)
 from sklearn.ensemble import ExtraTreesRegressor
 from api.utils.aws import sync_log_to_s3
 import logging
@@ -58,6 +58,7 @@ def generate_X_y(tables):
         ConsolidateTablesTransformer(count_encode=False),
         AddFutureReferralTargetFeatures(),
         TimeFeatureTransformer(break_length=28),
+        TimeWindowFeatures([1, 4, 12]),
         SplitCurrentAndEverTransformer(['referralissue_',
                                         'referraldomesticcircumstances_',
                                         'referralreason_', 'referralbenefit_'])

@@ -336,22 +336,24 @@ class TimeWindowFeatures(BaseTransformer):
         self.windows = windows
 
     def get_rolling_count(self, referrals, window_size=10):
-        unrolled = referrals.set_index('referral_referraltakendate').groupby('Client_Clientid').apply(
+        unrolled = referrals.set_index('referral_referraltakendate').groupby('client_clientid').apply(
             lambda k: k.groupby(pd.TimeGrouper('1W', convention='e')).size())
         # if only one client, split-apply-combine returns strange shape
-        if unrolled.index.name == 'Client_Clientid':
+        if unrolled.index.name == 'client_clientid':
             unrolled = unrolled.T
-            unrolled['Client_Clientid'] = unrolled.columns[0]
-            unrolled.columns = [0, 'Client_Clientid']
+            unrolled['client_clientid'] = unrolled.columns[0]
+            unrolled.columns = [0, 'client_clientid']
         referrals['weeks'] = referrals['referral_referraltakendate'] - pd.to_timedelta(
             referrals['referral_referraltakendate'].dt.dayofweek, unit='d') + pd.to_timedelta(6, unit='d')
         referrals['weeks'] = pd.to_datetime(referrals['weeks'].dt.date)
 
-        weighted = unrolled.groupby('Client_Clientid').apply(lambda k: k.rolling(window=window_size, min_periods=1)
+        weighted = unrolled.groupby('client_clientid').apply(lambda k: k.rolling(window=window_size, min_periods=1)
                                                              .sum()).reset_index()
 
-        merged = referrals.merge(weighted, right_on=['Client_Clientid', 'referral_referraltakendate'],
-                                 left_on=['Client_Clientid', 'weeks'])[0].fillna(0)
+        merged = referrals.reset_index().merge(weighted, right_on=['client_clientid', 'referral_referraltakendate'],
+                                               left_on=['client_clientid', 'weeks'])\
+            .set_index('referral_referralinstanceid')[0].fillna(0)
+
         return merged
 
     def get_all_rolling_counts(self, windows, referrals):
