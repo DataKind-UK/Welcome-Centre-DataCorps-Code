@@ -350,8 +350,10 @@ class TimeWindowFeatures(BaseTransformer):
         weighted = unrolled.groupby('client_clientid').apply(lambda k: k.rolling(window=window_size, min_periods=1)
                                                              .sum()).reset_index()
 
-        merged = referrals.merge(weighted, right_on=['client_clientid', 'referral_referraltakendate'],
-                                 left_on=['client_clientid', 'weeks'])[0].fillna(0)
+        merged = referrals.reset_index().merge(weighted, right_on=['client_clientid', 'referral_referraltakendate'],
+                                               left_on=['client_clientid', 'weeks'])\
+            .set_index('referral_referralinstanceid')[0].fillna(0)
+
         return merged
 
     def get_all_rolling_counts(self, windows, referrals):

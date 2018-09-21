@@ -2,7 +2,7 @@ import os
 import shutil
 from time import sleep
 
-from flask import Flask, redirect
+from flask import Flask, redirect, url_for
 from flask import request
 from flask_restplus import Api, Resource, abort
 
@@ -125,7 +125,7 @@ def run_retrain(source_filename, hyperparams=None, test=False):
         try:
             _, _, _, model = train_model_from_json(source, hyperparams=hyperparams, test=test)
             if test:
-                run_retrain(source_filename, target, hyperparams, False)
+                run_retrain(source_filename, hyperparams, False)
             else:
                 pickle.dump(model, open(target, 'wb'))
 
@@ -148,8 +148,8 @@ def run_retrain(source_filename, hyperparams=None, test=False):
 class Retrain(Resource):
     def get(self, input_file):
         run_retrain(input_file, test=True)
-        sleep(2)
-        return redirect('/retrain-log')
+        sleep(5)
+        return redirect(url_for('retrain_log'))
 
 @api.route('/retrain-log')
 class RetrainLog(Resource):
