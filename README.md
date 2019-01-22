@@ -1,14 +1,12 @@
 # Welcome Centre DataKind DataCorps Project
 
-## Background and context
+## Background and aims
 
 The Welcome Centre (TWC) is intended to provide short-term support to people experiencing a personal crisis, in the form of parcels containing food and other household items. If the crisis causing a need for parcels is not addressed, clients can develop a dependency on the support of the Welcome Centre. A support worker provides advice to those using the service to help address the underlying problems, and reduce the risk of such dependency developing.
 
 Identifying those in need of support is challenging, and compounded by the fact that often the only opportunity to speak with clients is when they arrive to collect their parcels. As a result, identifying people who might need to speak with the support worker when they are referred to the organisation to receive a parcel is important. Currently such clients are identified by their having requested a certain number of packs in the last six months.
 
-## Aims of the project
-
-To develop an automated method for identifying those clients who should be referred to the support worker. This needs to take place when volunteers are speaking to them on the phone and entering information into the client database. 
+DataKind UK and TWC partnered to build an automated method for identifying those clients who should be referred to the support worker. This needs to take place when volunteers are speaking to them on the phone and entering information into the client database. 
 
 ## Overview of the model
 
@@ -56,12 +54,19 @@ There was data available for teh past 3 years of TWC activity. This data covered
 ### Modeling Approach
 
 Every time a client is referred, the model will predict the dependency score based on the client’s history of referrals, client issues, referral issues and personal characteristics.
-[TO BE COMPLETED - David/James]
+
+The statistical model that was used to predict dependency is a predictive algorithm known as a random forest. This is a common method used by data scientists working with large structured datasets. The advantages of this algorithm are high predictive power and the ability to find non-linear relationships between our target variable (dependency) and explanatory variables (e.g. referral issue or time since last referral). The disadvantages of this model are that it can be too specific to information that it has seen before (and not be a good predictor of new behaviour), and the ability to understand the nature of the relationships between variables in the model is limited.
+
+The team chose this algorithm as it provided the best performance on a test set. Linear Ridge regression models were also tested as an approach to understanding the relationship, however these models did not perform as well.
 
 ### Interpreting the model results
 
-[TO BE COMPLETED - David/James/Andrew?]
+The model produces a predicted dependency score between 0 and 100. This score does not by itself show the whole picture as to whether a client is more likely to become dependent. What can provide more insight into a client’s behaviour is whether their current trend of referrals make it more likely that they are becoming dependent.
 
-## Guide to installation/setup
+To understand a client’s trend, we can use both the historical score and the predicted score. Every time a client is referred, the historical dependency score is calculated. For example, if this is the client’s first referral they would get a historical score of (1/52)*100 = 1.9. This historical dependency score is combined with the predicted dependency score to give a ratio:
 
-Should this go here or a separate readme just alongside the code?
+**Score Ratio = Predicted Score / Historical Score**
+
+This effectively measures how we expect a client’s usage of TWC to increase or decrease over time. A Score Ratio of 2.0 means we expect the client to come back twice as many times as they came before. This ratio is designed to avoid the system only referring heavy users to the support worker (TWC would likely have already seen them many times before) but instead identify users whose needs might be increasing, and who therefore may benefit from support.
+
+If the Score Ratio is over the set threshold, the client is flagged for referral to the support worker. The threshold below has been calibrated to achieve a 10% support worker referral. This can be easily adjusted over time. 
